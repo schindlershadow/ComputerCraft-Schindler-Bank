@@ -1,0 +1,14 @@
+{
+  {
+    name = "minecraft:diamond_block",
+    value = 1,
+  },
+  {
+    name = "botania:terrasteel_ingot",
+    value = 8,
+  },
+  {
+    name = "minecraft:netherite_ingot",
+    value = 10,
+  },
+}
