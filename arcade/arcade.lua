@@ -1,4 +1,5 @@
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
+local mirrorURL = "https://pastebin.com/raw/DW3LCC3L"
 local timeoutConnect = nil
 local bankServerSocket = nil
 local credits = 0
@@ -41,30 +42,38 @@ if settings.load() == false then
     pcall(sleep, 2)
 end
 
-
-local function patchCryptoNet(text)
-    --text = string.gsub(text, "os.pullEvent", "os.pullEventRaw")
-    --text = string.gsub(text, "Terminated", "NotTerminated")
-
-    return text
-end
-
 if not fs.exists("cryptoNet") then
     print("")
     print("cryptoNet API not found on disk, downloading...")
     local response = http.get(cryptoNetURL)
     if response then
         local file = fs.open("cryptoNet", "w")
-        local patchedText = patchCryptoNet(response.readAll())
-        file.write(patchedText)
+        file.write(response.readAll())
         file.close()
         response.close()
         print("File downloaded as '" .. "cryptoNet" .. "'.")
     else
         print("Failed to download file from " .. cryptoNetURL)
+        pcall(sleep,10)
     end
 end
 os.loadAPI("cryptoNet")
+
+if not fs.exists("mirror") then
+    print("")
+    print("mirror not found on disk, downloading...")
+    local response = http.get(mirrorURL)
+    if response then
+        local file = fs.open("mirror", "w")
+        file.write(response.readAll())
+        file.close()
+        response.close()
+        print("File downloaded as '" .. "mirror" .. "'.")
+    else
+        print("Failed to download file from " .. mirrorURL)
+        pcall(sleep,10)
+    end
+end
 
 --Dumps a table to string
 local function dump(o)
@@ -473,17 +482,21 @@ local function onStart()
     print("Connecting to server: " .. settings.get("BankServer"))
     log("Connecting to server: " .. settings.get("BankServer"))
 
+    if settings.get("debug") == true then
+        cryptoNet.setLoggingEnabled(true)
+    else
+        cryptoNet.setLoggingEnabled(false)
+    end
+
     timeoutConnect = os.startTimer(15)
     bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "back")
-
+    print("Connected!")
     --timeout no longer needed
     timeoutConnect = nil
     drawMainMenu()
 end
 
 print("Client is loading, please wait....")
-
-cryptoNet.setLoggingEnabled(true)
 
 --Main loop
 --cryptoNet.startEventLoop(onStart, onEvent)
