@@ -1,9 +1,8 @@
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
 local timeoutConnect = nil
 local bankServerSocket = nil
-local hopper, dropper, monitor
+local hopper, dropper, monitor, diskdrive
 local credits = 0
-local diskdrive = peripheral.find("drive")
 local speaker = peripheral.find("speaker")
 local width, height
 
@@ -21,6 +20,8 @@ settings.define("outputDropper",
     { description = "dropper used for this ATM", default = "minecraft:dropper_0", type = "string" })
 settings.define("atmMonitor",
     { description = "main monitor used for this ATM", default = "monitor_0", type = "string" })
+settings.define("diskdrive",
+    { description = "drive used for this host", default = "minecraft:dropper_0", type = "string" })
 
 --Settings fails to load
 if settings.load() == false then
@@ -31,6 +32,7 @@ if settings.load() == false then
     settings.set("ClientChest", "minecraft:barrel_0")
     settings.set("inputHopper", "minecraft:hopper_0")
     settings.set("outputDropper", "minecraft:dropper_0")
+    settings.set("diskdrive", "drive_0")
     settings.set("atmMonitor", "monitor_0")
     settings.set("debug", false)
     print("Stop the host and edit .settings file with correct settings")
@@ -721,7 +723,10 @@ local function drawMonitor()
             dumpDisk()
             sleep(5)
         else
+            redstone.setOutput("right", true)
             diskChecker()
+            sleep(1)
+            redstone.setOutput("right", false)
         end
         --sleep(10)
     end
@@ -735,6 +740,12 @@ local function onEvent(event)
         local socket = event[3]
         -- The logged-in username is also stored in the socket
         print(socket.username .. " just logged in.")
+        --timeout no longer needed
+        timeoutConnect = nil
+
+        --cryptoNet.send(bankServerSocket, { "getServerType" })
+
+        drawMonitor()
     elseif event[1] == "encrypted_message" then
         local socket = event[3]
         local message = event[2][1]
@@ -791,7 +802,10 @@ local function onStart()
     end
     --Close any old connections and servers
     cryptoNet.closeAll()
+    redstone.setOutput("right", false)
+    redstone.setOutput("left", false)
 
+    diskdrive = peripheral.wrap(settings.get("diskdrive"))
     hopper = peripheral.wrap(settings.get("inputHopper"))
     dropper = peripheral.wrap(settings.get("outputDropper"))
     bankChest = peripheral.wrap(settings.get("BankChest"))
@@ -810,13 +824,7 @@ local function onStart()
 
     timeoutConnect = os.startTimer(15)
     bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "back")
-
-    --timeout no longer needed
-    timeoutConnect = nil
-
-    --cryptoNet.send(bankServerSocket, { "getServerType" })
-
-    drawMonitor()
+    cryptoNet.login(bankServerSocket, "ATM", settings.get("password"))
 end
 
 print("Client is loading, please wait....")
@@ -827,3 +835,5 @@ cryptoNet.setLoggingEnabled(true)
 cryptoNet.startEventLoop(onStart, onEvent)
 
 cryptoNet.closeAll()
+redstone.setOutput("right", false)
+redstone.setOutput("left", false)

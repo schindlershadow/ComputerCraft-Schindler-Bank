@@ -170,12 +170,12 @@ local function printMonitorValue()
     if monitor ~= nil then
         monitor.setTextScale(1)
         monitor.clear()
-        monitor.setCursorPos(1,1)
+        monitor.setCursorPos(1, 1)
         centerText("Item deposit value list")
-        local line = 3        
+        local line = 3
         for k, v in pairs(valueList) do
             if v ~= nil and k ~= nil then
-                monitor.setCursorPos(1,line)
+                monitor.setCursorPos(1, line)
                 centerText(v.name .. ": #" .. tostring(v.value))
                 line = line + 1
             end
@@ -256,40 +256,93 @@ local function onEvent(event)
         end
         print(("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message)))
         log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
-        if message == "getServerType" then
-            cryptoNet.send(socket, { message, "BankServer" })
-        elseif message == "newID" then
-            local status = newID(data)
-            cryptoNet.send(socket, { message, status })
-        elseif message == "checkID" then
-            cryptoNet.send(socket, { message, checkIDExists(data) })
-        elseif message == "getCredits" then
-            cryptoNet.send(socket, { message, getCredits(data) })
-        elseif message == "getValue" then
-            cryptoNet.send(socket, { message, getValue(data) })
-        elseif message == "transfer" then
-            local fromID = data.fromID
-            local toID = data.toID
-            local credits = data.credits
-            local status = transferCredits(fromID, toID, credits)
-            cryptoNet.send(socket, { message, status })
-        elseif message == "pay" then
-            local id = data.id
-            local amount = data.amount
-            local credits = getCredits(id)
-            if credits + amount > 0 then
-                addCredits(id, amount)
-                cryptoNet.send(socket, { message, true })
-            else
-                cryptoNet.send(socket, { message, false })
+        debugLog("data:" ..textutils.serialise(data))
+        --These can only be used by logged in users
+        if socket.username ~= "LAN Host" then
+            if message == "getServerType" then
+                cryptoNet.send(socket, { message, "BankServer" })
+            elseif message == "newID" then
+                local status = newID(data)
+                cryptoNet.send(socket, { message, status })
+            elseif message == "checkID" then
+                cryptoNet.send(socket, { message, checkIDExists(data) })
+            elseif message == "getCredits" then
+                cryptoNet.send(socket, { message, getCredits(data) })
+            elseif message == "getValue" then
+                cryptoNet.send(socket, { message, getValue(data) })
+            elseif message == "transfer" then
+                local fromID = data.fromID
+                local toID = data.toID
+                local credits = data.credits
+                local status = transferCredits(fromID, toID, credits)
+                cryptoNet.send(socket, { message, status })
+            elseif message == "pay" then
+                if type(data) == "table" then
+                    local id = data.id
+                    local amount = data.amount
+                    if type(id) == "number" and type(data.amount) == "number" and checkIDExists(id) then
+                        local credits = getCredits(id)
+                        if credits - amount >= 0 then
+                            addCredits(id, (-1*amount))
+                            cryptoNet.send(socket, { message, true })
+                        else
+                            cryptoNet.send(socket, { message, false })
+                        end
+                    else
+                        cryptoNet.send(socket, { message, false })
+                    end
+                else
+                    cryptoNet.send(socket, { message, false })
+                end
+            elseif message == "depositItems" then
+                local chestName = data.chestName
+                local id = data.id
+                local value = getValue(chestName)
+                depositItems(chestName)
+                addCredits(id, value)
+                cryptoNet.send(socket, { message })
             end
-        elseif message == "depositItems" then
-            local chestName = data.chestName
-            local id = data.id
-            local value = getValue(chestName)
-            depositItems(chestName)
-            addCredits(id, value)
-            cryptoNet.send(socket, { message })
+        else
+            --These can be used by users not logged in
+            if message == "getServerType" then
+                cryptoNet.send(socket, { message, "BankServer" })
+            elseif message == "pay" then
+                if type(data) == "table" then
+                    local diskdriveName = data.diskdrive
+                    local amount = data.amount
+                    if type(diskdriveName) == "string" and type(amount) == "number" then
+                        local diskdrive = peripheral.wrap(diskdriveName)
+                        if diskdrive ~= nil then
+                            local id = diskdrive.getDiskID()
+                            if type(id) == "number" and type(data.amount) == "number" and checkIDExists(id) then
+                                local credits = getCredits(id)
+                                if credits - amount >= 0 then
+                                    addCredits(id, (-1*amount))
+                                    cryptoNet.send(socket, { message, true })
+                                else
+                                    debugLog("Failed: credits + amount > 0")
+                                    cryptoNet.send(socket, { message, false })
+                                end
+                            else
+                                debugLog("Failed: type(id) == number and type(data.amount) == number and checkIDExists(id)")
+                                cryptoNet.send(socket, { message, false })
+                            end
+                        end
+                    end
+                else
+                    cryptoNet.send(socket, { message, false })
+                end
+            elseif message == "checkID" then
+                if type(data) == "string" then
+                    local id = peripheral.wrap(data).getDiskID()
+                    cryptoNet.send(socket, { message, checkIDExists(id) })
+                end
+            elseif message == "getCredits" then
+                if type(data) == "string" then
+                    local id = peripheral.wrap(data).getDiskID()
+                    cryptoNet.send(socket, { message, getCredits(id) })
+                end
+            end
         end
     end
 end

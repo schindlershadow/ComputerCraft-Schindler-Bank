@@ -1,0 +1,13 @@
+{
+  debug = false,
+  cost = 1,
+  description = "Advanced port of Tetris",
+  BankServer = "BankServer18",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "ldris",
+  inputHopper = "minecraft:hopper_2",
+  clientName = "ldris1",
+  outputDropper = "minecraft:dropper_2",
+  diskdrive = "drive_6",
+  gameName = "ldris",
+}
