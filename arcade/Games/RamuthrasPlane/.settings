@@ -1,0 +1,14 @@
+{
+  debug = false,
+  enableTouch = false,
+  cost = 1,
+  description = "A puzzle/adventure game",
+  BankServer = "BankServer18",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "rmplane",
+  inputHopper = "minecraft:hopper_8",
+  clientName = "Ramuthra1",
+  outputDropper = "minecraft:dropper_7",
+  diskdrive = "drive_11",
+  gameName = "Ramuthras Plane",
+}
