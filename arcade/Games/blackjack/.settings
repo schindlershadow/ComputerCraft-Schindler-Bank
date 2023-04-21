@@ -1,0 +1,14 @@
+{
+  debug = false,
+  enableTouch = false,
+  cost = 1,
+  description = "Test",
+  BankServer = "BankServer18",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "test",
+  inputHopper = "minecraft:hopper_7",
+  clientName = "test1",
+  outputDropper = "minecraft:dropper_6",
+  diskdrive = "drive_10",
+  gameName = "test",
+}
