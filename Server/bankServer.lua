@@ -176,7 +176,7 @@ local function printMonitorValue()
         for k, v in pairs(valueList) do
             if v ~= nil and k ~= nil then
                 monitor.setCursorPos(1, line)
-                centerText(v.name .. ": #" .. tostring(v.value))
+                centerText(v.name .. ": \167" .. tostring(v.value))
                 line = line + 1
             end
         end
@@ -206,9 +206,12 @@ local function addCredits(id, value)
     for k, v in pairs(users) do
         if v.id == id then
             users[k].credits = users[k].credits + value
+            writeDatabase()
+            return true
         end
     end
     writeDatabase()
+    return false
 end
 
 local function transferCredits(fromID, toID, credits)
@@ -256,7 +259,7 @@ local function onEvent(event)
         end
         print(("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message)))
         log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
-        debugLog("data:" ..textutils.serialise(data))
+        debugLog("data:" .. textutils.serialise(data))
         --These can only be used by logged in users
         if socket.username ~= "LAN Host" then
             if message == "getServerType" then
@@ -283,7 +286,8 @@ local function onEvent(event)
                     if type(id) == "number" and type(data.amount) == "number" and checkIDExists(id) then
                         local credits = getCredits(id)
                         if credits - amount >= 0 then
-                            addCredits(id, (-1*amount))
+                            log("Credits change: ID:" .. tostring(id) .. " amount:" .. tostring(-1 * amount))
+                            addCredits(id, (-1 * amount))
                             cryptoNet.send(socket, { message, true })
                         else
                             cryptoNet.send(socket, { message, false })
@@ -317,14 +321,16 @@ local function onEvent(event)
                             if type(id) == "number" and type(data.amount) == "number" and checkIDExists(id) then
                                 local credits = getCredits(id)
                                 if credits - amount >= 0 then
-                                    addCredits(id, (-1*amount))
+                                    log("Credits change: ID:" .. tostring(id) .. " amount:" .. tostring(-1 * amount))
+                                    addCredits(id, (-1 * amount))
                                     cryptoNet.send(socket, { message, true })
                                 else
                                     debugLog("Failed: credits + amount > 0")
                                     cryptoNet.send(socket, { message, false })
                                 end
                             else
-                                debugLog("Failed: type(id) == number and type(data.amount) == number and checkIDExists(id)")
+                                debugLog(
+                                "Failed: type(id) == number and type(data.amount) == number and checkIDExists(id)")
                                 cryptoNet.send(socket, { message, false })
                             end
                         end

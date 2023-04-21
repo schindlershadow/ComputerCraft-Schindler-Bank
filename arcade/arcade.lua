@@ -230,6 +230,7 @@ local function playGame()
     local status = pay()
     if status then
         shell.run("mirror", "top", settings.get("launcher"))
+        term.setTextColor(colors.white)
     else
         loadingScreen("Failed to make payment")
         pcall(sleep, 2)
@@ -247,9 +248,9 @@ local function userMenu()
         centerText("Schindler Bank Client:" .. settings.get("clientName"))
         term.setCursorPos(1, 3)
         term.setBackgroundColor(colors.blue)
-        centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: " .. tostring(credits))
+        centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
         term.setCursorPos(1, 5)
-        centerText(tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        centerText("\167"..tostring(settings.get("cost")) .. " Credit(s), 1 Play")
         term.setBackgroundColor(colors.green)
         term.setCursorPos(1, 7)
         term.clearLine()
@@ -341,7 +342,7 @@ local function drawMonitorIntro(monitor)
         monitor.setCursorPos(1, 6)
         centerTextMonitor(monitor, "Please insert Floppy Disk")
         monitor.setCursorPos(1, 7)
-        centerTextMonitor(monitor, tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        centerTextMonitor(monitor, "\167"..tostring(settings.get("cost")) .. " Credit(s), 1 Play")
     end
 end
 
@@ -349,8 +350,12 @@ local function drawMainMenu()
     --term.setTextScale(0.5)
     term.setCursorPos(1, 1)
     local monitor = peripheral.wrap("top")
+    monitor.setTextColor(colors.white)
+    term.setTextColor(colors.white)
 
     while true do
+        term.setTextColor(colors.white)
+        monitor.setTextColor(colors.white)
         drawMonitorIntro(monitor)
         term.setBackgroundColor(colors.blue)
         term.clear()
@@ -366,7 +371,7 @@ local function drawMainMenu()
         term.setCursorPos(1, 6)
         centerText("Please insert Floppy Disk")
         term.setCursorPos(1, 7)
-        centerText(tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        centerText("\167"..tostring(settings.get("cost")) .. " Credit(s), 1 Play")
         --Look for floppydisk
         local diskSlot = 0
         while diskSlot == 0 do
@@ -479,7 +484,7 @@ local function onStart()
     dumpHopper()
     dumpDropper()
 
-    print("Connecting to server: " .. settings.get("BankServer"))
+    centerText("Connecting to server...")
     log("Connecting to server: " .. settings.get("BankServer"))
 
     if settings.get("debug") == true then

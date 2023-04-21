@@ -264,7 +264,7 @@ local function  mirrorToMonitors(fMain,tSides,sName) --tSides is table with moni
 				sFilter = resume( table.unpack( tEvent ) )
 			end
 			if coroutine.status( co ) ~= "dead" and (sFilter == nil or sFilter == "mouse_click") then
-				if tEvent[1] == "monitor_touch" and tMirrorsSides[tEvent[2]] then
+				if settings.get("enableTouch") and tEvent[1] == "monitor_touch" and tMirrorsSides[tEvent[2]] then
 					tEvent[3],tEvent[4] = tMirrorsSides[tEvent[2]].localize(tEvent[3],tEvent[4])
 					if tEvent[3] then
 						sFilter = resume( "mouse_click", 1, table.unpack( tEvent, 3 ) )

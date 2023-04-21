@@ -22,6 +22,8 @@ settings.define("atmMonitor",
     { description = "main monitor used for this ATM", default = "monitor_0", type = "string" })
 settings.define("diskdrive",
     { description = "drive used for this host", default = "minecraft:dropper_0", type = "string" })
+settings.define("password",
+    { description = "password used for this host", default = "password", type = "string" })
 
 --Settings fails to load
 if settings.load() == false then
@@ -34,6 +36,7 @@ if settings.load() == false then
     settings.set("outputDropper", "minecraft:dropper_0")
     settings.set("diskdrive", "drive_0")
     settings.set("atmMonitor", "monitor_0")
+    settings.set("password", "password")
     settings.set("debug", false)
     print("Stop the host and edit .settings file with correct settings")
     settings.save()
@@ -187,7 +190,7 @@ local function getCredits(id)
     repeat
         event, credits = os.pullEvent("gotCredits")
     until event == "gotCredits"
-    diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: " .. tostring(credits))
+    diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: \167" .. tostring(credits))
     return credits
 end
 
@@ -387,7 +390,7 @@ local function amountMenu(id)
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 2)
         monitor.setBackgroundColor(colors.blue)
-        centerText("From: ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: " .. tostring(credits))
+        centerText("From: ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 3)
         centerText("To: ID: " .. tostring(id))
         monitor.setCursorPos(1, 5)
@@ -497,7 +500,7 @@ local function transferMenu()
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
-        centerText("From: ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: " .. tostring(credits))
+        centerText("From: ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
         centerText("To: ID: " .. tostring(id))
         monitor.setBackgroundColor(colors.green)
@@ -594,7 +597,7 @@ local function userMenu()
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
-        centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: " .. tostring(credits))
+        centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
         centerText("Select a transaction")
         monitor.setBackgroundColor(colors.green)
@@ -670,7 +673,7 @@ local function diskChecker()
         repeat
             event = os.pullEvent("gotNewID")
         until event == "gotNewID"
-        diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: 0")
+        diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: \1670")
         loadingScreen("New User Created!")
         playAudioNewCustomer()
         sleep(1)
