@@ -4,12 +4,13 @@ local timeoutConnect = nil
 local bankServerSocket = nil
 local credits = 0
 local code = 0
+local wirelessModemSide = "left"
 local modemSide = "bottom"
 local monitorSide = "back"
 local redstoneSide = "right"
 local diskdrive
 local monitor = peripheral.wrap(monitorSide)
-local modem = peripheral.wrap(modemSide)
+local modem = peripheral.wrap(wirelessModemSide)
 
 settings.define("clientName",
     { description = "The hostname of this client", "client" .. tostring(os.getComputerID()), type = "string" })
@@ -523,12 +524,12 @@ local function onStart()
     cryptoNet.setLoggingEnabled(true)
 
     timeoutConnect = os.startTimer(5 + math.random(10))
-    bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "bottom")
+    bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", modemSide)
     print("Connected!")
     --timeout no longer needed
     timeoutConnect = nil
-    server = cryptoNet.host(settings.get("clientName"), true, false, modemSide)
-    rednet.open(modemSide)
+    server = cryptoNet.host(settings.get("clientName"), true, false, wirelessModemSide)
+    rednet.open(wirelessModemSide)
     drawMainMenu()
 end
 
