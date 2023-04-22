@@ -275,19 +275,20 @@ local function userMenu()
         monitor.clearLine()
         centerTextMonitor(monitor, "2) Exit")
         monitor.setCursorPos(1, 12)
+        monitor.setBackgroundColor(colors.white)
         centerTextMonitor(monitor, "Connect Code: " .. tostring(code))
 
         codeServer()
 
         local event, key, x, y
         repeat
-            event, key, x, y = os.pullEventRaw()
-        until event == "mouse_click"
+            event, key, is_held = os.pullEvent("key")
+        until event == "key"
 
-        if y >= 7 and y <= 9 then
+        if key == keys.one or key == keys.numPad1 then
             --play touched
             playGame()
-        elseif y >= 11 and y <= 13 then
+        elseif key == keys.two or key == keys.numPad2 then
             --exit touched
             done = true
             dumpHopper()
@@ -449,8 +450,10 @@ local function onEvent(event)
         if socket.username == nil then
             socket.username = "LAN Host"
         end
-        log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
-        if message == "newID" then
+        --log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
+        if message == "key" then
+            os.queueEvent("key", data[1], data[2])
+        elseif message == "newID" then
             os.queueEvent("gotNewID")
         elseif message == "checkID" then
             os.queueEvent("gotCheckID", data)

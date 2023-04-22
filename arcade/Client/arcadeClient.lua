@@ -47,6 +47,11 @@ local function connectToArcadeServer()
         print("Connected!")
         --timeout no longer needed
         timeoutConnect = nil
+        while true do
+            local event, key, is_held = os.pullEvent("key")
+            print(("%s held=%s"):format(keys.getName(key), is_held))
+            cryptoNet.send(arcadeServer, {"key", key, is_held})
+        end
     end
 end
 
