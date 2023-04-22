@@ -4,9 +4,12 @@ local timeoutConnect = nil
 local bankServerSocket = nil
 local credits = 0
 local code = 0
+local modemSide = "bottom"
+local monitorSide = "back"
+local redstoneSide = "right"
 local diskdrive
-local monitor = peripheral.wrap("back")
-local modem = peripheral.wrap("left")
+local monitor = peripheral.wrap(monitorSide)
+local modem = peripheral.wrap(modemSide)
 
 settings.define("clientName",
     { description = "The hostname of this client", "client" .. tostring(os.getComputerID()), type = "string" })
@@ -524,8 +527,8 @@ local function onStart()
     print("Connected!")
     --timeout no longer needed
     timeoutConnect = nil
-    server = cryptoNet.host(settings.get("clientName"), true, false, "left")
-    rednet.open("left")
+    server = cryptoNet.host(settings.get("clientName"), true, false, modemSide)
+    rednet.open(modemSide)
     drawMainMenu()
 end
 
@@ -537,5 +540,5 @@ pcall(cryptoNet.startEventLoop, onStart, onEvent)
 
 cryptoNet.closeAll()
 dumpDisk()
-redstone.setOutput("bottom", false)
+redstone.setOutput(redstoneSide, false)
 os.reboot()

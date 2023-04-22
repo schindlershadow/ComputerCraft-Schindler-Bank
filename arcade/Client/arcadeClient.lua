@@ -1,6 +1,7 @@
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
 local arcadeServer
-local modem = peripheral.wrap("back")
+local modemSide = "back"
+local modem = peripheral.wrap(modemSide)
 
 if modem == nil then
     print("No Wireless Modem found")
@@ -60,7 +61,7 @@ local function onEvent()
 end
 
 local function onStart()
-    rednet.open("back")
+    rednet.open(modemSide)
     connectToArcadeServer()
 
 end
