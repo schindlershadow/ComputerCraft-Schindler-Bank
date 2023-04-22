@@ -240,8 +240,21 @@ local function playGame()
     end
 end
 
+local function codeServer()
+    while true do
+        local id, message = rednet.receive()
+        if type(message) == "number" then
+            if message == code then
+                rednet.send(id, settings.get("clientName"))
+                return
+            end
+        end
+    end
+end
+
 local function userMenu()
     local done = false
+    code = math.random(1000, 9999)
     while done == false do
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
@@ -257,19 +270,14 @@ local function userMenu()
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
-        monitor.setCursorPos(1, 8)
-        monitor.clearLine()
         centerTextMonitor(monitor, "1) Play " .. settings.get("gameName"))
         monitor.setCursorPos(1, 9)
         monitor.clearLine()
-
-        monitor.setCursorPos(1, 11)
-        monitor.clearLine()
-        monitor.setCursorPos(1, 12)
-        monitor.clearLine()
         centerTextMonitor(monitor, "2) Exit")
-        monitor.setCursorPos(1, 13)
-        monitor.clearLine()
+        monitor.setCursorPos(1, 12)
+        centerTextMonitor(monitor, "Connect Code: " .. tostring(code))
+
+        codeServer()
 
         local event, key, x, y
         repeat
@@ -353,20 +361,7 @@ local function drawMonitorIntro()
         centerTextMonitor(monitor, "Please insert Floppy Disk")
         monitor.setCursorPos(1, 10)
         centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
-        monitor.setCursorPos(1, 12)
-        centerTextMonitor(monitor, "Connect Code: " .. tostring(code))
-    end
-end
-
-local function codeServer()
-    while true do
-        local id, message = rednet.receive()
-        if type(message) == "number" then
-            if message == code then
-                rednet.send(id, settings.get("clientName"))
-                return
-            end
-        end
+        
     end
 end
 
@@ -406,9 +401,7 @@ local function drawMainMenu()
         --Look for floppydisk
         local diskSlot = 0
         while diskSlot == 0 do
-            code = math.random(1000, 9999)
             drawMonitorIntro()
-            codeServer()
             if hopper ~= nil then
                 local itemList = hopper.list()
                 if itemList ~= nil then
