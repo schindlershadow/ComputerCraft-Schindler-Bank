@@ -825,7 +825,7 @@ local function onStart()
     print("Connecting to server: " .. settings.get("BankServer"))
     log("Connecting to server: " .. settings.get("BankServer"))
 
-    timeoutConnect = os.startTimer(15)
+    timeoutConnect = os.startTimer(5+math.random(5))
     bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "back")
     cryptoNet.login(bankServerSocket, "ATM", settings.get("password"))
 end

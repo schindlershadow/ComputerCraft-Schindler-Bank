@@ -416,7 +416,7 @@ local function onStart()
 
     printMonitorValue()
 
-    serverLAN = cryptoNet.host(settings.get("serverName", true, false))
+    serverLAN = cryptoNet.host(settings.get("serverName"), true, false, "left")
 end
 
 print("Server is loading, please wait....")

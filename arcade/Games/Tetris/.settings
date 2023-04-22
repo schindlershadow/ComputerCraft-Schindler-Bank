@@ -3,6 +3,7 @@
   cost = 1,
   description = "Advanced port of Tetris",
   BankServer = "BankServer18",
+  author = "LDDestroier",
   [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
   launcher = "ldris",
   inputHopper = "minecraft:hopper_2",

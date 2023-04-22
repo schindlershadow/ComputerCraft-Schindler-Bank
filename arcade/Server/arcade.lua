@@ -3,7 +3,10 @@ local mirrorURL = "https://pastebin.com/raw/DW3LCC3L"
 local timeoutConnect = nil
 local bankServerSocket = nil
 local credits = 0
+local code = 0
 local diskdrive
+local monitor = peripheral.wrap("back")
+local modem = peripheral.wrap("left")
 
 settings.define("clientName",
     { description = "The hostname of this client", "client" .. tostring(os.getComputerID()), type = "string" })
@@ -54,7 +57,7 @@ if not fs.exists("cryptoNet") then
         print("File downloaded as '" .. "cryptoNet" .. "'.")
     else
         print("Failed to download file from " .. cryptoNetURL)
-        pcall(sleep,10)
+        pcall(sleep, 10)
     end
 end
 os.loadAPI("cryptoNet")
@@ -71,7 +74,7 @@ if not fs.exists("mirror") then
         print("File downloaded as '" .. "mirror" .. "'.")
     else
         print("Failed to download file from " .. mirrorURL)
-        pcall(sleep,10)
+        pcall(sleep, 10)
     end
 end
 
@@ -229,7 +232,7 @@ end
 local function playGame()
     local status = pay()
     if status then
-        shell.run("mirror", "top", settings.get("launcher"))
+        shell.run("monitor", "top", settings.get("launcher"))
         term.setTextColor(colors.white)
     else
         loadingScreen("Failed to make payment")
@@ -240,33 +243,33 @@ end
 local function userMenu()
     local done = false
     while done == false do
-        term.setBackgroundColor(colors.blue)
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.setBackgroundColor(colors.black)
-        term.clearLine()
-        centerText("Schindler Bank Client:" .. settings.get("clientName"))
-        term.setCursorPos(1, 3)
-        term.setBackgroundColor(colors.blue)
-        centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
-        term.setCursorPos(1, 5)
-        centerText("\167"..tostring(settings.get("cost")) .. " Credit(s), 1 Play")
-        term.setBackgroundColor(colors.green)
-        term.setCursorPos(1, 7)
-        term.clearLine()
-        term.setCursorPos(1, 8)
-        term.clearLine()
-        centerText("Play " .. settings.get("gameName"))
-        term.setCursorPos(1, 9)
-        term.clearLine()
+        monitor.setBackgroundColor(colors.blue)
+        monitor.clear()
+        monitor.setCursorPos(1, 1)
+        monitor.setBackgroundColor(colors.black)
+        monitor.clearLine()
+        centerTextMonitor(monitor, "Schindler Bank Client:" .. settings.get("clientName"))
+        monitor.setCursorPos(1, 3)
+        monitor.setBackgroundColor(colors.blue)
+        centerTextMonitor(monitor, "ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
+        monitor.setCursorPos(1, 5)
+        centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        monitor.setBackgroundColor(colors.green)
+        monitor.setCursorPos(1, 7)
+        monitor.clearLine()
+        monitor.setCursorPos(1, 8)
+        monitor.clearLine()
+        centerTextMonitor(monitor, "1) Play " .. settings.get("gameName"))
+        monitor.setCursorPos(1, 9)
+        monitor.clearLine()
 
-        term.setCursorPos(1, 11)
-        term.clearLine()
-        term.setCursorPos(1, 12)
-        term.clearLine()
-        centerText("Exit")
-        term.setCursorPos(1, 13)
-        term.clearLine()
+        monitor.setCursorPos(1, 11)
+        monitor.clearLine()
+        monitor.setCursorPos(1, 12)
+        monitor.clearLine()
+        centerTextMonitor(monitor, "2) Exit")
+        monitor.setCursorPos(1, 13)
+        monitor.clearLine()
 
         local event, key, x, y
         repeat
@@ -325,7 +328,7 @@ local function diskChecker()
     end
 end
 
-local function drawMonitorIntro(monitor)
+local function drawMonitorIntro()
     if monitor ~= nil then
         monitor.setTextScale(1)
         monitor.setBackgroundColor(colors.blue)
@@ -337,26 +340,46 @@ local function drawMonitorIntro(monitor)
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
         centerTextMonitor(monitor, "Welcome to " .. settings.get("gameName") .. "!")
-        monitor.setCursorPos(1, 4)
+        monitor.setCursorPos(1, 5)
         centerTextMonitor(monitor, settings.get("description"))
-        monitor.setCursorPos(1, 6)
+        if string.len(settings.get("author")) > 1 then
+            monitor.setCursorPos(1, 6)
+            centerTextMonitor(monitor, "by " .. settings.get("author"))
+            monitor.setCursorPos(1, 7)
+            centerTextMonitor(monitor, "Forked by Schindler")
+        end
+
+        monitor.setCursorPos(1, 9)
         centerTextMonitor(monitor, "Please insert Floppy Disk")
-        monitor.setCursorPos(1, 7)
-        centerTextMonitor(monitor, "\167"..tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        monitor.setCursorPos(1, 10)
+        centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        monitor.setCursorPos(1, 12)
+        centerTextMonitor(monitor, "Connect Code: " .. tostring(code))
+    end
+end
+
+local function codeServer()
+    while true do
+        local id, message = rednet.receive()
+        if type(message) == "number" then
+            if message == code then
+                rednet.send(id, settings.get("clientName"))
+                return
+            end
+        end
     end
 end
 
 local function drawMainMenu()
     --term.setTextScale(0.5)
     term.setCursorPos(1, 1)
-    local monitor = peripheral.wrap("top")
     monitor.setTextColor(colors.white)
     term.setTextColor(colors.white)
 
     while true do
         term.setTextColor(colors.white)
         monitor.setTextColor(colors.white)
-        drawMonitorIntro(monitor)
+        
         term.setBackgroundColor(colors.blue)
         term.clear()
         term.setCursorPos(1, 1)
@@ -366,15 +389,26 @@ local function drawMainMenu()
         term.setCursorPos(1, 3)
         term.setBackgroundColor(colors.blue)
         centerText("Welcome to " .. settings.get("gameName") .. "!")
-        term.setCursorPos(1, 4)
+        term.setCursorPos(1, 5)
         centerText(settings.get("description"))
-        term.setCursorPos(1, 6)
+
+        if string.len(settings.get("author")) > 1 then
+            term.setCursorPos(1, 6)
+            centerText("by " .. settings.get("author"))
+            term.setCursorPos(1, 7)
+            centerText("Forked by Schindler")
+        end
+        term.setCursorPos(1, 9)
         centerText("Please insert Floppy Disk")
-        term.setCursorPos(1, 7)
-        centerText("\167"..tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        term.setCursorPos(1, 10)
+        centerText("\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        
         --Look for floppydisk
         local diskSlot = 0
         while diskSlot == 0 do
+            code = math.random(1000, 9999)
+            drawMonitorIntro()
+            codeServer()
             if hopper ~= nil then
                 local itemList = hopper.list()
                 if itemList ~= nil then
@@ -487,17 +521,15 @@ local function onStart()
     centerText("Connecting to server...")
     log("Connecting to server: " .. settings.get("BankServer"))
 
-    if settings.get("debug") == true then
-        cryptoNet.setLoggingEnabled(true)
-    else
-        cryptoNet.setLoggingEnabled(false)
-    end
+    cryptoNet.setLoggingEnabled(true)
 
-    timeoutConnect = os.startTimer(15)
-    bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "back")
+    timeoutConnect = os.startTimer(5 + math.random(10))
+    bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "bottom")
     print("Connected!")
     --timeout no longer needed
     timeoutConnect = nil
+    server = cryptoNet.host(settings.get("clientName"), true, false, "left")
+    rednet.open("left")
     drawMainMenu()
 end
 
