@@ -1,0 +1,30 @@
+{
+  {
+    key = "\27 and \26",
+    discription = "Move Piece",
+  },
+  {
+    key = "\24",
+    discription = "Hard Drop",
+  },
+  {
+    key = "\25",
+    discription = "Soft Drop",
+  },
+  {
+    key = "SPACE",
+    discription = "Sonic Drop",
+  },
+  {
+    key = "Z and X",
+    discription = "Rotate",
+  },
+  {
+    key = "L.SHIFT",
+    discription = "Hold Piece",
+  },
+  {
+    key = "Q",
+    discription = "Quit",
+  },
+}

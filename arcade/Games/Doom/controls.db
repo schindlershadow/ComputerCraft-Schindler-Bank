@@ -1,0 +1,26 @@
+{
+  {
+    key = "\27 \26 \24 \25",
+    discription = "Move Camera",
+  },
+  {
+    key = "W A S D",
+    discription = "Move Player",
+  },
+  {
+    key = "SPACE",
+    discription = "Fire",
+  },
+  {
+    key = "Q",
+    discription = "Turn Around 180",
+  },
+  {
+    key = "G",
+    discription = "Change Graphics mode",
+  },
+  {
+    key = "C",
+    discription = "Quit",
+  },
+}

@@ -1,0 +1,15 @@
+{
+  debug = false,
+  enableTouch = false,
+  cost = 1,
+  description = "A two-player game",
+  author = "LDDestroier",
+  BankServer = "BankServer18",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "tron",
+  inputHopper = "minecraft:hopper_16",
+  clientName = "Tron1",
+  outputDropper = "minecraft:dropper_23",
+  diskdrive = "drive_19",
+  gameName = "Tron",
+}

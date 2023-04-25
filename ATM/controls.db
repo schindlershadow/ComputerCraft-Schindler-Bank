@@ -1,0 +1,10 @@
+{
+  {
+    key = "ENTER",
+    discription = "Accept",
+  },
+  {
+    key = "BACKSPACE",
+    discription = "Cancel",
+  },
+}

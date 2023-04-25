@@ -1,0 +1,14 @@
+{
+  {
+    key = "\27 \26 \24 \25",
+    discription = "Move",
+  },
+  {
+    key = "W A S D",
+    discription = "Pan Camera",
+  },
+  {
+    key = "SPACE",
+    discription = "Stop Trail",
+  },
+}

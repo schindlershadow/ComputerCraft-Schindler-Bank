@@ -1,11 +1,11 @@
 os.loadAPI("cryptoNet")
 -- Init
-local bankServerSocketBlackJack, controllerSocket
+local bankServerSocketBlackJack
 local quit = false
 local id = 0
 local cash = 0
 local total = 0
-local termX, termY = term.getSize()
+local termX,termY =  term.getSize()
 local diskdrive = peripheral.wrap(settings.get("diskdrive"))
 term.setBackgroundColor(colors.gray)
 term.setTextColor(colors.white)
@@ -220,11 +220,11 @@ function redraw()
     spacing = spacing + 4
   end
   if buttons then
-    term.setCursorPos(10, 21)
+    term.setCursorPos(10, 17)
     term.setBackgroundColor(colors.lightGray)
     term.setTextColor(colors.gray)
     write(" Stand ")
-    term.setCursorPos(18, 21)
+    term.setCursorPos(18, 17)
     if doubled then
       term.setBackgroundColor(colors.gray)
       term.setTextColor(colors.lightGray)
@@ -233,7 +233,7 @@ function redraw()
       term.setTextColor(colors.gray)
     end
     write(" Hit ")
-    term.setCursorPos(24, 21)
+    term.setCursorPos(24, 17)
     if cash >= (bet * 2) and not doubled then
       term.setBackgroundColor(colors.lightGray)
       term.setTextColor(colors.gray)
@@ -242,7 +242,7 @@ function redraw()
       term.setTextColor(colors.lightGray)
     end
     write(" Double ")
-    term.setCursorPos(33, 21)
+    term.setCursorPos(33, 17)
     if #playerHand == 2 and playerHand[1] == playerHand[2] then
       term.setBackgroundColor(colors.lightGray)
       term.setTextColor(colors.gray)
@@ -252,7 +252,7 @@ function redraw()
     end
     write(" Split ")
   end
-  term.setCursorPos(2, 20)
+  term.setCursorPos(2, 16)
   term.setBackgroundColor(colors.green)
   term.setTextColor(colors.white)
   write("Credits: ")
@@ -260,14 +260,14 @@ function redraw()
   term.setTextColor(colors.lime)
   write("\167" .. tostring(cash))
   if bet ~= nil then
-    term.setCursorPos(2, 22)
+    term.setCursorPos(2, 18)
     term.setTextColor(colors.white)
     write("Bet: ")
     term.setTextColor(colors.red)
     write("\167" .. tostring(bet))
   end
   term.setTextColor(colors.white)
-  term.setCursorPos(2, 19)
+  term.setCursorPos(2, 15)
   write("ID: " .. tostring(id))
   term.setCursorPos(2, 2)
   write("Max Bet: \167" .. tostring(settings.get("maxBet")))
@@ -275,13 +275,13 @@ function redraw()
   term.setTextColor(colors.white)
   if deckCount then
     write("Deck:")
-    term.setCursorPos(46, 21)
+    term.setCursorPos(46, 17)
     term.setTextColor(colors.lightGray)
     write(tostring(#deck))
   end
   if cardCount then
     write("Count:")
-    term.setCursorPos(46, 21)
+    term.setCursorPos(46, 17)
     term.setTextColor(colors.white)
     write(tostring(faceCount))
   end
@@ -312,7 +312,7 @@ end
 
 function winAnim()
   dollars = {}
-  for i = 1, termX do
+  for i = 1, 51 do
     dollars[i] = math.random(-5, 0)
   end
   term.setTextColor(colors.yellow)
@@ -324,7 +324,7 @@ function winAnim()
         write("\127")
       end
       dollars[x] = dollars[x] + 1
-      if (v + 1) >= 1 and (v + 1) <= termX then
+      if (v + 1) >= 1 and (v + 1) <= 51 then
         term.setCursorPos(x, v + 1)
         write("$")
       end
@@ -403,11 +403,11 @@ function playHand()
   redraw()
   if not splitCard then
     repeat
-      paintutils.drawFilledBox(10, 21, 39, 21, colors.green)
-      term.setCursorPos(18, 22)
+      paintutils.drawFilledBox(10, 17, 39, 17, colors.green)
+      term.setCursorPos(18, 18)
       term.setTextColor(colors.white)
       center("Bet -1 to exit")
-      term.setCursorPos(18, 21)
+      term.setCursorPos(18, 17)
       term.setTextColor(colors.white)
       write("Bet: ")
       bet = 0
@@ -693,8 +693,6 @@ local function onEvent(event)
       os.queueEvent("gotDepositItems")
     elseif message == "transfer" then
       os.queueEvent("gotTransfer", data)
-    elseif message == "keyPressed" then
-      controllerSocket = socket
     end
   elseif event[1] == "quitGame" then
     quit = true
@@ -754,9 +752,8 @@ local function onStart()
   --drawAnalysis()
   getCredits()
   cryptoNet.close(bankServerSocketBlackJack)
-  cryptoNet.close(controllerSocket)
   cryptoNet.closeAll()
-  os.queueEvent("quitGame")
+  --os.queueEvent("quitGame")
   --os.queueEvent("terminate")
   os.reboot()
 end

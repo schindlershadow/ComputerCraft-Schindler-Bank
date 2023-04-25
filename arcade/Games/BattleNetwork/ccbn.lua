@@ -361,7 +361,14 @@ local receive = function()
 	if useSkynet then
 		return ({skynet.receive(channel)})[2]
 	else
-		return ({os.pullEvent("modem_message")})[5]
+		local event, key, message
+		repeat
+		event, key, _, _, message = os.pullEvent()
+		until event == "modem_message" or (event == "key" and key == keys.q)
+		if (event == "key" and key == keys.q) then
+			return false
+		end
+		return message
 	end
 end
 
@@ -1471,8 +1478,14 @@ local runGame = function()
 					pID = you,
 				})
 
+				local ttl = 0
 				repeat
 					sleep(0)
+					ttl = ttl + 1
+					cwrite("Waiting for other player " .. tostring(math.floor(60-(ttl*0.05))), scr_y - 3)
+					if ttl > 1200 then
+						return
+					end
 				until cliChipSelect
 
 				players[cliChipSelect.pID].chipQueue = cliChipSelect.chipQueue
@@ -1499,6 +1512,11 @@ local runGame = function()
 				cwrite("Waiting for other player...", scr_y - 3)
 				repeat
 					msg = receive()
+					if type(msg) == "boolean" then
+						if msg == false then
+							return
+						end
+					end
 					msg = type(msg) == "table" and msg or {}
 				until (
 					msg.gameID == gameID and
@@ -1770,6 +1788,11 @@ local startGame = function()
 	cwrite("Waiting for game...")
 	repeat
 		msg = receive()
+		if type(msg) == "boolean" then
+			if msg == false then
+				return
+			end
+		end
 	until interpretNetMessage(msg)
 	gameID = isHost and gameID or msg.gameID
 	transmit({

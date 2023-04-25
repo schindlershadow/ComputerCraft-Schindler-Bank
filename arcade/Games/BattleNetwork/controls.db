@@ -1,0 +1,22 @@
+{
+  {
+    key = "\27 \26 \24 \25",
+    discription = "Move",
+  },
+  {
+    key = "Z",
+    discription = "MegaBuster",
+  },
+  {
+    key = "X",
+    discription = "Use BattleChip",
+  },
+  {
+    key = "C",
+    discription = "End Turn",
+  },
+  {
+    key = "Q",
+    discription = "Quit waiting for player",
+  },
+}

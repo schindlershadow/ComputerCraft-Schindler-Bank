@@ -1,0 +1,14 @@
+{
+  debug = true,
+  cost = 1,
+  description = "Doom inspired FPS",
+  BankServer = "BankServer18",
+  author = "Xella37",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "Doom",
+  inputHopper = "minecraft:hopper_12",
+  clientName = "Doom1",
+  outputDropper = "minecraft:dropper_12",
+  diskdrive = "drive_15",
+  gameName = "Doom",
+}

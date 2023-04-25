@@ -1,0 +1,16 @@
+{
+  debug = false,
+  maxBet = 5,
+  enableTouch = false,
+  cost = 0,
+  description = "Slot Machine",
+  author = "wv1106",
+  BankServer = "BankServer18",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "slots",
+  inputHopper = "minecraft:hopper_18",
+  clientName = "Slots1",
+  outputDropper = "minecraft:dropper_25",
+  diskdrive = "drive_21",
+  gameName = "Slots",
+}

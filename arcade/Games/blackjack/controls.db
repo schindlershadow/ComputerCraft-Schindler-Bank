@@ -1,0 +1,18 @@
+{
+  {
+    key = "S or 1",
+    discription = "Stand",
+  },
+  {
+    key = "H or 2",
+    discription = "Hit",
+  },
+  {
+    key = "D or 3",
+    discription = "Double",
+  },
+  {
+    key = "L or 4",
+    discription = "Split",
+  },
+}

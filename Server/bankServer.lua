@@ -1,5 +1,6 @@
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
-local serverLAN, storageChest, monitor
+local serverLAN, storageChest
+local monitors = {}
 local users = {}
 local valueList = {}
 
@@ -12,8 +13,8 @@ settings.define("StorageChest",
         type = "string"
     })
 settings.define("debug", { description = "Enables debug options", default = "false", type = "boolean" })
-settings.define("bankMonitor",
-    { description = "main monitor used for this bank server", default = "monitor_0", type = "string" })
+settings.define("bankMonitors",
+    { description = "main monitor used for this bank server", default = { "monitor_0" }, type = "table" })
 
 --Settings fails to load
 if settings.load() == false then
@@ -21,7 +22,7 @@ if settings.load() == false then
     settings.set("serverName", "BankServer" .. tostring(os.getComputerID()))
     settings.set("StorageChest", "ironchests:diamond_chest_1")
     settings.set("debug", false)
-    settings.set("bankMonitor", "monitor_0")
+    settings.set("bankMonitors", { "monitor_0" })
     print("Stop the server and edit .settings file with correct settings")
     settings.save()
     sleep(2)
@@ -144,6 +145,9 @@ local function getItemValue(itemName)
 end
 
 local function getValue(chestName)
+    if type(chestName) ~= "string" or chestName == "nil" then
+        return 0
+    end
     local chest = peripheral.wrap(chestName)
     local itemList = chest.list()
     local total = 0
@@ -156,7 +160,7 @@ local function getValue(chestName)
     return total
 end
 
-local function centerText(text)
+local function centerText(monitor, text)
     if text == nil then
         text = ""
     end
@@ -167,17 +171,22 @@ local function centerText(text)
 end
 
 local function printMonitorValue()
-    if monitor ~= nil then
-        monitor.setTextScale(1)
-        monitor.clear()
-        monitor.setCursorPos(1, 1)
-        centerText("Item deposit value list")
-        local line = 3
-        for k, v in pairs(valueList) do
-            if v ~= nil and k ~= nil then
-                monitor.setCursorPos(1, line)
-                centerText(v.name .. ": \167" .. tostring(v.value))
-                line = line + 1
+    if monitors ~= nil then
+        for k, monitorName in pairs(monitors) do
+            local monitor = peripheral.wrap(monitorName)
+            if monitor ~= nil then
+                monitor.setTextScale(1)
+                monitor.clear()
+                monitor.setCursorPos(1, 1)
+                centerText(monitor, "Item deposit value list")
+                local line = 3
+                for k, v in pairs(valueList) do
+                    if v ~= nil and k ~= nil then
+                        monitor.setCursorPos(1, line)
+                        centerText(monitor, v.name .. ": \167" .. tostring(v.value))
+                        line = line + 1
+                    end
+                end
             end
         end
     end
@@ -305,6 +314,16 @@ local function onEvent(event)
                 depositItems(chestName)
                 addCredits(id, value)
                 cryptoNet.send(socket, { message })
+            elseif message == "getCertificate" then
+                local fileContents = nil
+                print("Sending Cert " .. socket.sender .. ".crt")
+                local filePath = socket.sender .. ".crt"
+                if fs.exists(filePath) then
+                    local file = fs.open(filePath, "r")
+                    fileContents = file.readAll()
+                    file.close()
+                end
+                cryptoNet.send(socket, { message, fileContents })
             end
         else
             --These can be used by users not logged in
@@ -330,7 +349,7 @@ local function onEvent(event)
                                 end
                             else
                                 debugLog(
-                                "Failed: type(id) == number and type(data.amount) == number and checkIDExists(id)")
+                                    "Failed: type(id) == number and type(data.amount) == number and checkIDExists(id)")
                                 cryptoNet.send(socket, { message, false })
                             end
                         end
@@ -348,6 +367,16 @@ local function onEvent(event)
                     local id = peripheral.wrap(data).getDiskID()
                     cryptoNet.send(socket, { message, getCredits(id) })
                 end
+            elseif message == "getCertificate" then
+                local fileContents = nil
+                print("Sending Cert " .. socket.sender .. ".crt")
+                local filePath = socket.sender .. ".crt"
+                if fs.exists(filePath) then
+                    local file = fs.open(filePath, "r")
+                    fileContents = file.readAll()
+                    file.close()
+                end
+                cryptoNet.send(socket, { message, fileContents })
             end
         end
     end
@@ -366,7 +395,7 @@ local function onStart()
     cryptoNet.closeAll()
 
     storageChest = peripheral.wrap(settings.get("StorageChest"))
-    monitor = peripheral.wrap(settings.get("bankMonitor"))
+    monitors = settings.get("bankMonitors")
 
     --Read user database from disk
     if fs.exists("database.db") then
@@ -416,7 +445,7 @@ local function onStart()
 
     printMonitorValue()
 
-    serverLAN = cryptoNet.host(settings.get("serverName"), true, false, "left")
+    serverLAN = cryptoNet.host(settings.get("serverName"), true, false)
 end
 
 print("Server is loading, please wait....")
