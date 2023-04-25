@@ -377,7 +377,7 @@ function playHand()
     center("You're ruined!")
     term.setCursorPos(1, 13)
     term.setTextColor(colors.red)
-    center("0 Credits")
+    center("\1670 Credits")
     sleep(5)
     quit = true
     return

@@ -79,7 +79,7 @@ function checkUpdates()
     local filepath = "startup.lua"
     -- Get the latest commit hash from the repository
     local commiturl = "https://api.github.com/repos/" ..
-    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
+        owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
     local commitresponse = http.get(commiturl)
     if type(commitresponse) == "nil" then
         print("Failed to check for update")
@@ -111,7 +111,8 @@ function checkUpdates()
     if currentCommit ~= latestCommit then
         print("Update found with SHA256: " .. tostring(latestCommit))
         -- Download the latest script file
-        local startupURL = "https://raw.githubusercontent.com/" .. owner .. "/" .. repo .. "/main/".. githubFolder .. "/" .. githubFilename
+        local startupURL = "https://raw.githubusercontent.com/" ..
+            owner .. "/" .. repo .. "/main/" .. githubFolder .. "/" .. githubFilename
         local response = http.get(startupURL)
         local data = response.readAll()
         response.close()
@@ -380,12 +381,14 @@ local function userMenu()
         monitor.setBackgroundColor(colors.blue)
         centerTextMonitor(monitor, "ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
-        if settings.get("cost") < 1 then
+        if settings.get("cost") <= 0 then
             centerTextMonitor(monitor, "Free to play")
+        elseif settings.get("cost") == 1 then
+            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
         else
-            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
         end
-        
+
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
@@ -484,7 +487,20 @@ local function drawMonitorIntro()
         monitor.setCursorPos(1, 9)
         centerTextMonitor(monitor, "Please insert Floppy Disk")
         monitor.setCursorPos(1, 10)
-        centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        if settings.get("cost") <= 0 then
+            centerTextMonitor(monitor, "Free to play")
+        elseif settings.get("cost") == 1 then
+            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
+        else
+            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
+        end
+
+        if settings.get("debug") then
+            monitor.setCursorPos(1, 12)
+            monitor.setTextColor(colors.red)
+            centerTextMonitor(monitor, "DEBUG MODE")
+            monitor.setTextColor(colors.white)
+        end
     end
 end
 
@@ -711,8 +727,9 @@ checkUpdates()
 print("Client is loading, please wait....")
 
 --Staggered launch
-sleep((1 + math.random(30)))
-
+if not settings.get("debug") then
+    sleep((1 + math.random(30)))
+end
 --Main loop
 --cryptoNet.startEventLoop(onStart, onEvent)
 pcall(cryptoNet.startEventLoop, onStart, onEvent)

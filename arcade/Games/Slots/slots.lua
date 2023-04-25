@@ -8,11 +8,11 @@ local jackpot = 0
 
 
 ---------------------	percentage to win the following
-local diamondW = 6 -- % chance to land diamond
-local dollarW = 9  -- % chance to land dollar
-local sevenW = 12  -- % chance to land seven
-local bellW = 15   -- % chance to land bell
-local orangeW = 18 -- % chance to land orange
+local diamondW = 2 -- % chance to land diamond
+local dollarW = 10 -- % chance to land dollar
+local sevenW = 13  -- % chance to land seven
+local bellW = 14   -- % chance to land bell
+local orangeW = 19 -- % chance to land orange
 
 --don't change enything after this
 ----------------------
@@ -134,6 +134,21 @@ local function drawJackpot()
     sleep(1)
 end
 
+local function drawNoCredits()
+    term.setBackgroundColor(colors.black)
+    term.clear()
+    paintutils.drawImage(paintutils.loadImage("/dollar"), 1, 1)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.setCursorPos(1, 11)
+    centerText("You're ruined!")
+    term.setCursorPos(1, 13)
+    term.setTextColor(colors.red)
+    centerText("\1670 Credits")
+    term.setTextColor(colors.white)
+    sleep(5)
+end
+
 local function getCredits()
     local event
     os.queueEvent("requestCredits")
@@ -162,6 +177,8 @@ function insert_amount()
     term.clear()
     while true do
         if credits == 0 then
+            debugLog("drawNoCredits")
+            drawNoCredits()
             quit = true
             return
         end
@@ -485,7 +502,7 @@ if settings.get("debug") then
     debugLog("Total: " .. tostring(total) .. " Cost: " .. tostring(runs * cost) .. " Net: " .. tostring(net))
     debugLog("Winning %: " .. tostring(100 + (total / (runs * cost) * 100)))
 
-    drawJackpot()
+    --drawJackpot()
     jackpot = 0
 end
 
