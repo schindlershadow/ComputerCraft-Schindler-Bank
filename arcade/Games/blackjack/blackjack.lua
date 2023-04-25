@@ -1,4 +1,4 @@
-os.loadAPI("cryptoNet")
+--os.loadAPI("cryptoNet")
 -- Init
 local bankServerSocketBlackJack, controllerSocket
 local quit = false
@@ -11,30 +11,24 @@ term.setBackgroundColor(colors.gray)
 term.setTextColor(colors.white)
 term.clear()
 
-local function getCredits(checkid)
-  if checkid == nil then
-    checkid = diskdrive.getDiskID()
-  end
+local function getCredits()
   cash = 0
   local event
-  cryptoNet.send(bankServerSocketBlackJack, { "getCredits", settings.get("diskdrive") })
+  os.queueEvent("requestCredits")
   repeat
-    event, cash = os.pullEventRaw()
+    event, cash = os.pullEvent()
   until event == "gotCredits"
-  diskdrive.setDiskLabel("ID: " .. tostring(checkid) .. " Credits: " .. tostring(cash))
   return cash
 end
 
 local function pay(amount)
+  amount = tonumber(amount)
   local event
   local status = false
-  local tmp = {}
-  tmp.diskdrive = settings.get("diskdrive")
-  tmp.amount = tonumber(amount)
-  total = total + (-1 * tmp.amount)
-  cryptoNet.send(bankServerSocketBlackJack, { "pay", tmp })
+  total = total + (-1 * amount)
+  os.queueEvent("requestPay", amount)
   repeat
-    event, status = os.pullEventRaw()
+    event, status = os.pullEvent()
   until event == "gotPay"
   getCredits()
   return status
@@ -658,62 +652,12 @@ local function drawAnalysis()
   term.setTextColor(colors.gray)
   write(" Close ")
   repeat
-    e = os.pullEventRaw()
+    e = os.pullEvent()
   until e == "key"
   quit = true
 end
 
---Cryptonet event handler
-local function onEvent(event)
-  if event[1] == "login" then
-    local username = event[2]
-    -- The socket of the client that just logged in
-    local socket = event[3]
-    -- The logged-in username is also stored in the socket
-    --print(socket.username .. " just logged in.")
-  elseif event[1] == "encrypted_message" then
-    local socket = event[3]
-    local message = event[2][1]
-    local data = event[2][2]
-    if socket.username == nil then
-      socket.username = "LAN Host"
-    end
-    --log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
-    if message == "newID" then
-      os.queueEvent("gotNewID")
-    elseif message == "checkID" then
-      os.queueEvent("gotCheckID", data)
-    elseif message == "getCredits" then
-      os.queueEvent("gotCredits", data)
-    elseif message == "pay" then
-      os.queueEvent("gotPay", data)
-    elseif message == "getValue" then
-      os.queueEvent("gotValue", data)
-    elseif message == "depositItems" then
-      os.queueEvent("gotDepositItems")
-    elseif message == "transfer" then
-      os.queueEvent("gotTransfer", data)
-    elseif message == "keyPressed" then
-      controllerSocket = socket
-    end
-  elseif event[1] == "quitGame" then
-    quit = true
-    return
-  end
-end
-
 local function onStart()
-  center("Client is loading, please wait....")
-
-  center("Connecting to server...")
-  --log("Connecting to server: " .. settings.get("BankServer"))
-
-  if settings.get("debug") == true then
-    cryptoNet.setLoggingEnabled(true)
-  else
-    cryptoNet.setLoggingEnabled(false)
-  end
-
   -- Start Game
   paintutils.drawFilledBox(1, 7, termX, 11, colors.lightGray)
   term.setCursorPos(1, 8)
@@ -724,17 +668,13 @@ local function onStart()
   center("Deluxe")
   term.setTextColor(colors.white)
 
-  timeoutConnect = os.startTimer(15)
-  bankServerSocketBlackJack = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt",
-    "bottom")
+  --bankServerSocketBlackJack = cryptoNet.connect(settings.get("BankServer"), 5, 2, settings.get("BankServer") .. ".crt", "bottom")
   --print("Connected!")
   --timeout no longer needed
-  timeoutConnect = nil
-  id = diskdrive.getDiskID()
-  getCredits(id)
+  getCredits()
 
 
-  --sleep(3)
+  sleep(3)
   faceCount = 0
   for i = 1, 19 do
     paintutils.drawFilledBox(1, i, termX, i, colors.green)
@@ -747,21 +687,12 @@ local function onStart()
     playHand()
     if #deck < 12 then
       drawAnalysis()
-      --os.queueEvent("quitGame")
       quit = true
     end
   end
-  --drawAnalysis()
   getCredits()
-  cryptoNet.close(bankServerSocketBlackJack)
-  cryptoNet.close(controllerSocket)
-  cryptoNet.closeAll()
-  os.queueEvent("quitGame")
-  --os.queueEvent("terminate")
-  os.reboot()
 end
 
 --Main loop
-cryptoNet.startEventLoop(onStart, onEvent)
---os.reboot()
-cryptoNet.closeAll()
+onStart()
+
