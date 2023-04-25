@@ -1,3 +1,5 @@
+local githubFilename = "bankServer.lua"
+local githubFolder = "Server"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
 local serverLAN, storageChest
 local monitors = {}
@@ -43,6 +45,78 @@ if not fs.exists("cryptoNet") then
     end
 end
 os.loadAPI("cryptoNet")
+
+-- Define a function to check for updates
+function checkUpdates()
+    print("Checking for updates")
+    -- Set the GitHub repository information
+    local owner = "schindlershadow"
+    local repo = "ComputerCraft-Schindler-Bank"
+
+    -- Set the script file information
+    local filepath = "startup.lua"
+    -- Get the latest commit hash from the repository
+    local commiturl = "https://api.github.com/repos/" ..
+    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
+    local commitresponse = http.get(commiturl)
+    if type(commitresponse) == "nil" then
+        print("Failed to check for update")
+        sleep(3)
+        return
+    end
+    local responseCode = commitresponse.getResponseCode()
+    if responseCode ~= 200 then
+        print("Failed to check for update")
+        sleep(3)
+        return
+    end
+    local commitdata = commitresponse.readAll()
+    commitresponse.close()
+    local latestCommit = textutils.unserializeJSON(commitdata).sha
+
+    local currentCommit = ""
+    --Get the current commit sha
+    if fs.exists("sha") then
+        --Read the current file
+        local file = fs.open("sha", "r")
+        currentCommit = file.readAll()
+        file.close()
+    end
+
+    print("Current SHA256: " .. tostring(currentCommit))
+
+    -- Check if the latest commit is different from the current one
+    if currentCommit ~= latestCommit then
+        print("Update found with SHA256: " .. tostring(latestCommit))
+        -- Download the latest script file
+        local startupURL = "https://raw.githubusercontent.com/" .. owner .. "/" .. repo .. "/main/".. githubFolder .. "/" .. githubFilename
+        local response = http.get(startupURL)
+        local data = response.readAll()
+        response.close()
+
+        --remove old version
+        fs.delete(filepath)
+        -- Save the downloaded file to disk
+        local newfile = fs.open(filepath, "w")
+        newfile.write(data)
+        newfile.close()
+
+        if fs.exists("sha") then
+            fs.delete("sha")
+        end
+        --write new sha
+        local shafile = fs.open("sha", "w")
+        shafile.write(latestCommit)
+        shafile.close()
+
+        -- Print a message to the console
+        print("Updated " .. githubFilename .. " to the latest version.")
+        sleep(3)
+        os.reboot()
+    else
+        print("No update found")
+    end
+end
 
 --Dumps a table to string
 local function dump(o)
@@ -448,6 +522,7 @@ local function onStart()
     serverLAN = cryptoNet.host(settings.get("serverName"), true, false)
 end
 
+checkUpdates()
 print("Server is loading, please wait....")
 
 cryptoNet.setLoggingEnabled(true)

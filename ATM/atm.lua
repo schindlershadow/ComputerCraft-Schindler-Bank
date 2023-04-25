@@ -76,6 +76,17 @@ function checkUpdates()
     local commiturl = "https://api.github.com/repos/" ..
     owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
     local commitresponse = http.get(commiturl)
+    if type(commitresponse) == "nil" then
+        print("Failed to check for update")
+        sleep(3)
+        return
+    end
+    local responseCode = commitresponse.getResponseCode()
+    if responseCode ~= 200 then
+        print("Failed to check for update")
+        sleep(3)
+        return
+    end
     local commitdata = commitresponse.readAll()
     commitresponse.close()
     local latestCommit = textutils.unserializeJSON(commitdata).sha
