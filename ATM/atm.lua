@@ -1,4 +1,7 @@
+local startupURL = "https://raw.githubusercontent.com/schindlershadow/ComputerCraft-Schindler-Bank/main/ATM/atm.lua"
+local githubFolder = "ATM"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
+local SHA_256_URL = "https://pastebin.com/raw/gsFrNjbt"
 local dropperRedstoneSide = "right"
 local doorRedstoneSide = "left"
 local speaker = peripheral.wrap("top")
@@ -59,6 +62,67 @@ if not fs.exists("cryptoNet") then
     end
 end
 os.loadAPI("cryptoNet")
+
+-- Define a function to check for updates
+function checkUpdates()
+    print("Checking for updates")
+    -- Set the GitHub repository information
+    local owner = "schindlershadow"
+    local repo = "ComputerCraft-Schindler-Bank"
+
+    -- Set the script file information
+    local filename = "atm.lua"
+    local filepath = "startup.lua"
+    -- Get the latest commit hash from the repository
+    local commiturl = "https://api.github.com/repos/" ..
+    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. filename
+    local commitresponse = http.get(commiturl)
+    local commitdata = commitresponse.readAll()
+    commitresponse.close()
+    local latestCommit = textutils.unserializeJSON(commitdata).sha
+
+    local currentCommit = ""
+    --Get the current commit sha
+    if fs.exists("sha") then
+        --Read the current file
+        local file = fs.open("sha", "r")
+        currentCommit = file.readAll()
+        file.close()
+    end
+
+    print("Current SHA256: " .. tostring(currentCommit))
+
+    -- Check if the latest commit is different from the current one
+    if currentCommit ~= latestCommit then
+        print("Update found with SHA256: " .. tostring(latestCommit))
+        -- Download the latest script file
+        local response = http.get(startupURL)
+        local data = response.readAll()
+        response.close()
+
+        --remove old version
+        fs.delete(filepath)
+        -- Save the downloaded file to disk
+        local newfile = fs.open(filepath, "w")
+        newfile.write(data)
+        newfile.close()
+
+        if fs.exists("sha") then
+            fs.delete("sha")
+        end
+        --write new sha
+        local shafile = fs.open("sha", "w")
+        shafile.write(latestCommit)
+        shafile.close()
+
+        -- Print a message to the console
+        print("Updated " .. filename .. " to the latest version.")
+        sleep(3)
+        os.reboot()
+    else
+        print("No update found")
+    end
+end
 
 --Dumps a table to string
 local function dump(o)
@@ -1065,6 +1129,8 @@ local function onStart()
     print("Opening cryptoNet server")
     server = cryptoNet.host(settings.get("clientName"), true, false, wirelessModem.side)
 end
+
+checkUpdates()
 
 print("Client is loading, please wait....")
 
