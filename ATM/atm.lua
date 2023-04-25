@@ -1,4 +1,3 @@
-local startupURL = "https://raw.githubusercontent.com/schindlershadow/ComputerCraft-Schindler-Bank/main/ATM/atm.lua"
 local githubFilename = "atm.lua"
 local githubFolder = "ATM"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
@@ -96,6 +95,7 @@ function checkUpdates()
     if currentCommit ~= latestCommit then
         print("Update found with SHA256: " .. tostring(latestCommit))
         -- Download the latest script file
+        local startupURL = "https://raw.githubusercontent.com/" .. owner .. "/" .. repo .. "/main/".. githubFolder .. "/" .. githubFilename
         local response = http.get(startupURL)
         local data = response.readAll()
         response.close()
