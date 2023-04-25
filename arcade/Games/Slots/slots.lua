@@ -2,6 +2,7 @@
 --please install this using the installer on my pastebin -wv1106
 --------------------------------------------------
 
+local speaker = peripheral.wrap("top")
 local limit = settings.get("maxBet") --minimum creds to play
 local quit = false
 local jackpot = 0
@@ -42,6 +43,13 @@ local creds = 0
 local nr1 = 0
 multeplier = 0
 local amount = limit
+--------symbols-----------
+local diamond = paintutils.loadImage("images/diamond.nfp") -- a,b
+local bell = paintutils.loadImage("images/bell.nfp")       -- b,c
+local seven = paintutils.loadImage("images/7.nfp")         -- c,d
+local dollar = paintutils.loadImage("images/dollar.nfp")   -- d,e
+local orange = paintutils.loadImage("images/orange.nfp")   -- e,f
+local none = paintutils.loadImage("images/none.nfp")       -- the rest
 -----------------------
 local offset = 2
 local termX, termY = term.getSize()
@@ -90,6 +98,19 @@ debugLog("dW: " .. tostring(dW))
 debugLog("eW: " .. tostring(eW))
 debugLog("fW: " .. tostring(fW))
 
+--Play audioFile on speaker
+local function playAudio(audioFile)
+    local dfpwm = require("cc.audio.dfpwm")
+    speaker.stop()
+    local decoder = dfpwm.make_decoder()
+    for chunk in io.lines(audioFile, 16 * 1024) do
+        local buffer = decoder(chunk)
+        while not speaker.playAudio(buffer, 3) do
+            os.pullEvent("speaker_audio_empty")
+        end
+    end
+end
+
 local function getJackpot()
     if fs.exists("jackpot") then
         local file = fs.open("jackpot", "r")
@@ -118,6 +139,7 @@ end
 
 local function drawJackpot()
     term.setTextColor(colors.white)
+    playAudio("jackpot.dfpwm")
     for i = 1, 10 do
         if (i % 2 == 0) then
             term.setBackgroundColor(colors.blue)
@@ -129,9 +151,42 @@ local function drawJackpot()
         centerText("JACKPOT WINNER")
         term.setCursorPos(1, 13)
         centerText("\167" .. tostring(jackpot) .. " CREDITS")
+
+        paintutils.drawImage(diamond,2, 2)
+        paintutils.drawImage(diamond,10, 2)
+        paintutils.drawImage(diamond,20, 2)
+        paintutils.drawImage(diamond,30, 2)
+        paintutils.drawImage(diamond,40, 2)
+        paintutils.drawImage(diamond,termX-8, 2)
+
+        paintutils.drawImage(diamond,2, 7)
+        paintutils.drawImage(diamond,2, 13)
+        paintutils.drawImage(diamond,termX-8, 7)
+        paintutils.drawImage(diamond,termX-8, 13)
+        paintutils.drawImage(diamond,2, 19)
+        paintutils.drawImage(diamond,10, 19)
+        paintutils.drawImage(diamond,20, 19)
+        paintutils.drawImage(diamond,30, 19)
+        paintutils.drawImage(diamond,40, 19)
+        paintutils.drawImage(diamond,termX-8, 19)
         sleep(0.5)
     end
     sleep(1)
+end
+
+local function drawRandomImage(x, y)
+    local randomNum = math.random(5)
+    if randomNum == 1 then
+        paintutils.drawImage(seven, x, y)
+    elseif randomNum == 2 then
+        paintutils.drawImage(orange, x, y)
+    elseif randomNum == 3 then
+        paintutils.drawImage(dollar, x, y)
+    elseif randomNum == 4 then
+        paintutils.drawImage(bell, x, y)
+    else
+        paintutils.drawImage(diamond, x, y)
+    end
 end
 
 local function drawNoCredits()
@@ -208,9 +263,21 @@ function insert_amount()
         centerText("Max Bet: \167" .. tostring(limit))
         term.setCursorPos(18, 9)
         centerText("Enter -1 to quit")
+
+        drawRandomImage(2, 7)
+        drawRandomImage(2, 13)
+        drawRandomImage(termX-8, 7)
+        drawRandomImage(termX-8, 13)
+        drawRandomImage(2, 19)
+        drawRandomImage(10, 19)
+        drawRandomImage(20, 19)
+        drawRandomImage(30, 19)
+        drawRandomImage(40, 19)
+        drawRandomImage(termX-8, 19)
+
+        term.setBackgroundColor(colors.green)
         term.setCursorPos(18, 12)
         centerText("Bet Amount: \167")
-        --term.setCursorPos(24, 13)
         amount = tonumber(io.read())
 
         if amount == -1 then
@@ -224,19 +291,12 @@ function insert_amount()
     --creds = creds - amount
     local status = false
     status = pay(amount)
+    playAudio("coins-handling.dfpwm")
     --writeCard()
     if not status then
         quit = true
     end
 end
-
---------symbols-----------
-local diamond = paintutils.loadImage("images/diamond.nfp") -- a,b
-local bell = paintutils.loadImage("images/bell.nfp")       -- b,c
-local seven = paintutils.loadImage("images/7.nfp")         -- c,d
-local dollar = paintutils.loadImage("images/dollar.nfp")   -- d,e
-local orange = paintutils.loadImage("images/orange.nfp")   -- e,f
-local none = paintutils.loadImage("images/none.nfp")       -- the rest
 
 function slotmachiene()
     --drawBox(1, 1, termX, termY, colors.green)
@@ -362,6 +422,7 @@ function roll()
         drawBox(6, 7, 18, 13, colors.lightGray)
         drawImage(orange, 8, 8)
     end
+    playAudio("row.dfpwm")
     for x = 1, 25 do
         random_2()
         random_3()
@@ -384,6 +445,7 @@ function roll()
         drawBox(20, 7, 32, 13, colors.lightGray)
         drawImage(orange, 22, 8)
     end
+    playAudio("row.dfpwm")
     for x = 1, 25 do
         random_3()
         sleep(0, 5)
@@ -405,6 +467,7 @@ function roll()
         drawBox(34, 7, 46, 13, colors.lightGray)
         drawImage(orange, 36, 8)
     end
+    playAudio("row.dfpwm")
 end
 
 function pricewon()
@@ -430,6 +493,7 @@ function pricewon()
         centerText("Winner!")
         term.setCursorPos(1, 13)
         centerText("\167" .. priceamount .. " Credits")
+        playAudio("win.dfpwm")
     elseif multeplier < 1 then
         setJackpot(jackpot + (amount / 2))
         term.setBackgroundColor(colors.red)
@@ -438,6 +502,7 @@ function pricewon()
         centerText("You lost")
         term.setCursorPos(1, 15)
         centerText("Better luck next time")
+        playAudio("lose.dfpwm")
     end
     term.setCursorPos(16, 17)
     centerText("Press any key to continue")
@@ -453,6 +518,8 @@ function lever()
     centerText("Press any key to roll")
 
     os.pullEvent("key")
+    playAudio("lever-pull.dfpwm")
+    sleep(1)
 end
 
 if settings.get("debug") then
@@ -504,6 +571,11 @@ if settings.get("debug") then
 
     --drawJackpot()
     jackpot = 0
+    --playAudio("coins-handling.dfpwm")
+    --playAudio("slotmachiene.dfpwm")
+    --playAudio("win.dfpwm")
+    --playAudio("lose.dfpwm")
+    --playAudio("lever-pull.dfpwm")
 end
 
 ---------------------
