@@ -1,4 +1,5 @@
 local startupURL = "https://raw.githubusercontent.com/schindlershadow/ComputerCraft-Schindler-Bank/main/ATM/atm.lua"
+local githubFilename = "atm.lua"
 local githubFolder = "ATM"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
 local SHA_256_URL = "https://pastebin.com/raw/gsFrNjbt"
@@ -71,11 +72,10 @@ function checkUpdates()
     local repo = "ComputerCraft-Schindler-Bank"
 
     -- Set the script file information
-    local filename = "atm.lua"
     local filepath = "startup.lua"
     -- Get the latest commit hash from the repository
     local commiturl = "https://api.github.com/repos/" ..
-    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. filename
+    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
     local commitresponse = http.get(commiturl)
     local commitdata = commitresponse.readAll()
     commitresponse.close()
@@ -116,7 +116,7 @@ function checkUpdates()
         shafile.close()
 
         -- Print a message to the console
-        print("Updated " .. filename .. " to the latest version.")
+        print("Updated " .. githubFilename .. " to the latest version.")
         sleep(3)
         os.reboot()
     else
