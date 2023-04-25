@@ -293,7 +293,7 @@ local function getCredits(id)
     local event
     cryptoNet.send(bankServerSocket, { "getCredits", settings.get("diskdrive") })
     repeat
-        event, credits = os.pullEventRaw()
+        event, credits = os.pullEvent()
     until event == "gotCredits"
     diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: " .. tostring(credits))
     return credits
@@ -311,7 +311,7 @@ local function pay(amount)
     end
     cryptoNet.send(bankServerSocket, { "pay", tmp })
     repeat
-        event, status = os.pullEventRaw()
+        event, status = os.pullEvent()
     until event == "gotPay"
     getCredits()
     return status
@@ -324,6 +324,7 @@ local function playGame()
         shell.run("monitor", monitorSide, settings.get("launcher"))
         monitor.setTextColor(colors.white)
         monitor.setTextScale(1)
+        getCredits()
     else
         loadingScreen("Failed to make payment")
         pcall(sleep, 2)
@@ -379,7 +380,12 @@ local function userMenu()
         monitor.setBackgroundColor(colors.blue)
         centerTextMonitor(monitor, "ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
-        centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        if settings.get("cost") < 1 then
+            centerTextMonitor(monitor, "Free to play")
+        else
+            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit(s), 1 Play")
+        end
+        
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
@@ -422,7 +428,7 @@ local function checkID()
     loadingScreen("Loading information from server...")
     cryptoNet.send(bankServerSocket, { "checkID", settings.get("diskdrive") })
     repeat
-        event, isRegistered = os.pullEventRaw()
+        event, isRegistered = os.pullEvent()
     until event == "gotCheckID"
 
     return isRegistered
@@ -699,6 +705,7 @@ local function onStart()
     drawMainMenu()
 end
 
+loadingScreen("Arcade is loading")
 checkUpdates()
 
 print("Client is loading, please wait....")
