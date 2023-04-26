@@ -335,6 +335,11 @@ end
 local function codeServer()
     while true do
         local id, message = rednet.receive()
+        if type(message) == "string" then
+            if message == "timeoutConnectController" then
+                return
+            end
+        end
         if type(message) == "number" then
             if message == code then
                 rednet.send(id, settings.get("clientName"))
@@ -366,9 +371,10 @@ local function userMenu()
 
     codeServer()
     os.cancelTimer(timeoutConnectController)
+    timeoutConnectController = nil
 
     --timeout for controller to connect
-    timeoutConnectController = os.startTimer(5)
+    timeoutConnectController = os.startTimer(15)
 
     while done == false do
         monitor.setBackgroundColor(colors.blue)
@@ -401,8 +407,19 @@ local function userMenu()
         local event, key, x, y
         repeat
             event, key, is_held = os.pullEvent("key")
-        until event == "key"
+        until event == "key" or event == "timeoutConnectController"
 
+        if event == "timeoutConnectController" then
+            drawDiskReminder()
+            done = true
+            dumpDisk()
+            dumpHopper()
+            --Close connection to controller
+            if controllerSocket ~= nil then
+                cryptoNet.close(controllerSocket)
+            end
+            sleep(5)
+        end
         if key == keys.one or key == keys.numPad1 then
             --play pressed
             playGame()
@@ -417,7 +434,7 @@ local function userMenu()
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
             end
-            sleep(10)
+            sleep(5)
         end
     end
     dumpDisk()
@@ -610,9 +627,15 @@ local function onEvent(event)
                 os.queueEvent("char", data[1])
             end
         elseif message == "controllerConnect" then
-            controllerSocket = socket
-            timeoutConnectController = nil
-            print("Controller connected")
+            if controllerSocket == nil then
+                controllerSocket = socket
+                os.cancelTimer(timeoutConnectController)
+                timeoutConnectController = nil
+                print("Controller connected")
+            else
+                print("Duplicate controller conection attempt!")
+                log("Duplicate controller conection attempt!")
+            end
         elseif message == "getControls" then
             print("Controls requested")
             local file = fs.open("controls.db", "r")
@@ -645,7 +668,7 @@ local function onEvent(event)
             os.queueEvent("gotTransfer", data)
         end
     elseif event[1] == "timer" then
-        if event[2] == timeoutConnect or event[2] == timeoutConnectController then
+        if event[2] == timeoutConnect then
             --Reboot after failing to connect
             loadingScreen("Failed to connect, rebooting...")
             cryptoNet.closeAll()
@@ -653,6 +676,16 @@ local function onEvent(event)
             dumpHopper()
             dumpDropper()
             os.reboot()
+        elseif event[2] == timeoutConnectController then
+            if controllerSocket ~= nil then
+                cryptoNet.close(controllerSocket)
+            end
+            os.queueEvent("rednet_message", 0, "timeoutConnectController")
+            dumpDisk()
+            dumpHopper()
+            dumpDropper()
+            debugLog("timeoutConnectController")
+            os.queueEvent("timeoutConnectController")
         end
     elseif event[1] == "connection_closed" then
         --print(dump(event))
