@@ -38,7 +38,7 @@ function checkUpdates()
     local filepath = "startup.lua"
     -- Get the latest commit hash from the repository
     local commiturl = "https://api.github.com/repos/" ..
-    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
+        owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
     local commitresponse = http.get(commiturl)
     if type(commitresponse) == "nil" then
         print("Failed to check for update")
@@ -70,7 +70,8 @@ function checkUpdates()
     if currentCommit ~= latestCommit then
         print("Update found with SHA256: " .. tostring(latestCommit))
         -- Download the latest script file
-        local startupURL = "https://raw.githubusercontent.com/" .. owner .. "/" .. repo .. "/main/".. githubFolder .. "/" .. githubFilename
+        local startupURL = "https://raw.githubusercontent.com/" ..
+        owner .. "/" .. repo .. "/main/" .. githubFolder .. "/" .. githubFilename
         local response = http.get(startupURL)
         local data = response.readAll()
         response.close()
@@ -109,6 +110,19 @@ local function centerText(text)
     term.write(text)
 end
 
+local function loadingScreen(text)
+    if type(text) == nil then
+        text = ""
+    end
+    term.setBackgroundColor(colors.red)
+    term.clear()
+    term.setCursorPos(1, 2)
+    centerText(text)
+    term.setCursorPos(1, 4)
+    centerText("Loading...")
+    term.setCursorPos(1, 6)
+end
+
 local function debugLog(text)
     if settings.get("debug") then
         local logFile = fs.open("logs/serverDebug.log", "a")
@@ -124,7 +138,7 @@ end
 local function connectToArcadeServer()
     term.setCursorPos(1, 1)
     term.clear()
-    print("Enter the code displayed on the monitor: ")
+    print("Put this Pocket Computer in your offhand and enter the code displayed on the monitor: ")
     local input = read()
     local code = tonumber(input)
     if code == nil then
@@ -140,8 +154,10 @@ local function connectToArcadeServer()
         connectToArcadeServer()
         return
     else
-        timeoutConnect = os.startTimer(5 + math.random(10))
-        arcadeServer = cryptoNet.connect(message)
+        term.clear()
+        loadingScreen("Connecting")
+        timeoutConnect = os.startTimer(15)
+        arcadeServer = cryptoNet.connect(message, 30, 5)
         cryptoNet.send(arcadeServer, { "controllerConnect" })
         cryptoNet.send(arcadeServer, { "getControls" })
         local event
@@ -151,7 +167,9 @@ local function connectToArcadeServer()
         until event == "gotControls"
         print("Connected!")
         --timeout no longer needed
+        os.cancelTimer(timeoutConnect)
         timeoutConnect = nil
+        term.setBackgroundColor(colors.black)
         term.clear()
         term.setCursorPos(1, 1)
         print("Controls")
@@ -216,6 +234,11 @@ local function onEvent(event)
         elseif message == "transfer" then
             os.queueEvent("gotTransfer", data)
         end
+    elseif event[1] == "timer" then
+        if event[2] == timeoutConnect then
+            cryptoNet.closeAll()
+            os.reboot()
+        end
     end
 end
 
@@ -261,6 +284,7 @@ local function onStart()
         term.write("2) Help")
         term.setCursorPos(1, 20)
         term.write("ID:" .. os.getComputerID())
+        term.setCursorPos(1, 1)
 
         local event, key
         repeat
@@ -277,7 +301,9 @@ local function onStart()
 end
 
 checkUpdates()
-
+cryptoNet.setLoggingEnabled(false)
 pcall(cryptoNet.startEventLoop, onStart, onEvent)
 cryptoNet.closeAll()
-os.reboot()
+if not settings.get("debug") then
+    os.reboot()
+end
