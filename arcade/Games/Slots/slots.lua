@@ -10,10 +10,10 @@ local jackpot = 0
 
 ---------------------	percentage to win the following
 local diamondW = 2 -- % chance to land diamond
-local dollarW = 10 -- % chance to land dollar
+local dollarW = 11 -- % chance to land dollar
 local sevenW = 13  -- % chance to land seven
-local bellW = 14   -- % chance to land bell
-local orangeW = 19 -- % chance to land orange
+local bellW = 16   -- % chance to land bell
+local orangeW = 22 -- % chance to land orange
 
 --don't change enything after this
 ----------------------
@@ -468,6 +468,7 @@ function roll()
         drawImage(orange, 36, 8)
     end
     playAudio("row.dfpwm")
+    sleep(0.5)
 end
 
 function pricewon()
@@ -495,7 +496,7 @@ function pricewon()
         centerText("\167" .. priceamount .. " Credits")
         playAudio("win.dfpwm")
     elseif multeplier < 1 then
-        setJackpot(jackpot + (amount / 2))
+        setJackpot(jackpot + (amount / 4))
         term.setBackgroundColor(colors.red)
         term.clear()
         term.setCursorPos(1, 11)
@@ -522,15 +523,15 @@ function lever()
     sleep(1)
 end
 
-if settings.get("debug") then
+local function testRun(runs, jackpotNumber)
+    jackpot = jackpotNumber
     local jp = 0
     local onep75 = 0
     local onep5 = 0
     local onep25 = 0
     local one = 0
     local zero = 0
-    local runs = 1000
-    local cost = 1
+    local cost = 50
     local total = 0
 
     local results = {}
@@ -541,7 +542,7 @@ if settings.get("debug") then
         table.insert(results, multeplier)
         if multeplier == 0 then
             zero = zero + 1
-            jackpot = jackpot + ((cost * multeplier) / 2)
+            jackpot = jackpot + ((cost * multeplier) / 4)
         elseif multeplier == 1 then
             one = one + 1
         elseif multeplier == 2 then
@@ -560,22 +561,35 @@ if settings.get("debug") then
     local net = total + (runs * cost)
 
     debugLog("Totals")
+    debugLog("runs: " .. tostring(runs) .. " jackpotNumber: " .. tostring(jackpotNumber))
+    print(("runs: " .. tostring(runs) .. " jackpotNumber: " .. tostring(jackpotNumber)))
     debugLog("0: " .. tostring(zero) .. " | " .. tostring((zero / runs) * 100) .. "%")
     debugLog("1: " .. tostring(one) .. " | " .. tostring((one / runs) * 100) .. "%")
     debugLog("1.25: " .. tostring(onep25) .. " | " .. tostring((onep25 / runs) * 100) .. "%")
     debugLog("1.5: " .. tostring(onep5) .. " | " .. tostring((onep5 / runs) * 100) .. "%")
     debugLog("1.75: " .. tostring(onep75) .. " | " .. tostring((onep75 / runs) * 100) .. "%")
-    debugLog("jackpot: " .. tostring(jp) .. " | " .. tostring((jp / runs) * 100) .. "%")
+    debugLog("jackpot: " .. tostring(jp) .. " | " .. tostring((jp / runs) * 100) .. "% Left: " .. tostring(jackpot) )
     debugLog("Total: " .. tostring(total) .. " Cost: " .. tostring(runs * cost) .. " Net: " .. tostring(net))
     debugLog("Winning %: " .. tostring(100 + (total / (runs * cost) * 100)))
+    print("Winning %: " .. tostring(100 + (total / (runs * cost) * 100)))
+    
 
     --drawJackpot()
     jackpot = 0
+end
+
+if settings.get("debug") then
+    term.setCursorPos(1,1)
+    testRun(1000000,0)
+    testRun(1000000,10000)
+    testRun(1000000,100000)
+    testRun(1000000,1000000)
     --playAudio("coins-handling.dfpwm")
     --playAudio("slotmachiene.dfpwm")
     --playAudio("win.dfpwm")
     --playAudio("lose.dfpwm")
     --playAudio("lever-pull.dfpwm")
+    sleep(5)
 end
 
 ---------------------
