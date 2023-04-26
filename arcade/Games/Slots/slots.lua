@@ -10,10 +10,10 @@ local jackpot = 0
 
 ---------------------	percentage to win the following
 local diamondW = 2 -- % chance to land diamond
-local dollarW = 11 -- % chance to land dollar
-local sevenW = 13  -- % chance to land seven
-local bellW = 16   -- % chance to land bell
-local orangeW = 22 -- % chance to land orange
+local dollarW = 13 -- % chance to land dollar
+local sevenW = 15  -- % chance to land seven
+local bellW = 25   -- % chance to land bell
+local orangeW = 12 -- % chance to land orange
 
 --don't change enything after this
 ----------------------
@@ -66,6 +66,19 @@ local function drawImage(image, x, y)
     paintutils.drawImage(image, x + offset, y + offset)
 end
 
+local function drawTransition()
+    for i = 1, termY do
+        if i == 1 then
+            paintutils.drawLine(1, i, termX, i, colors.black)
+        elseif i < 5 then
+            paintutils.drawLine(1, i, termX, i, colors.blue)
+        else
+            paintutils.drawLine(1, i, termX, i, colors.green)
+        end
+        sleep(0)
+    end
+end
+
 local function centerText(text)
     if text == nil then
         text = ""
@@ -100,13 +113,15 @@ debugLog("fW: " .. tostring(fW))
 
 --Play audioFile on speaker
 local function playAudio(audioFile)
-    local dfpwm = require("cc.audio.dfpwm")
-    speaker.stop()
-    local decoder = dfpwm.make_decoder()
-    for chunk in io.lines(audioFile, 16 * 1024) do
-        local buffer = decoder(chunk)
-        while not speaker.playAudio(buffer, 3) do
-            os.pullEvent("speaker_audio_empty")
+    if fs.exists(audioFile) then
+        local dfpwm = require("cc.audio.dfpwm")
+        speaker.stop()
+        local decoder = dfpwm.make_decoder()
+        for chunk in io.lines(audioFile, 16 * 1024) do
+            local buffer = decoder(chunk)
+            while not speaker.playAudio(buffer, 3) do
+                os.pullEvent("speaker_audio_empty")
+            end
         end
     end
 end
@@ -128,6 +143,7 @@ local function getJackpot()
 end
 
 local function setJackpot(number)
+    number = math.floor(number)
     if fs.exists("jackpot") then
         fs.delete("jackpot")
     end
@@ -152,23 +168,23 @@ local function drawJackpot()
         term.setCursorPos(1, 13)
         centerText("\167" .. tostring(jackpot) .. " CREDITS")
 
-        paintutils.drawImage(diamond,2, 2)
-        paintutils.drawImage(diamond,10, 2)
-        paintutils.drawImage(diamond,20, 2)
-        paintutils.drawImage(diamond,30, 2)
-        paintutils.drawImage(diamond,40, 2)
-        paintutils.drawImage(diamond,termX-8, 2)
+        paintutils.drawImage(diamond, 2, 2)
+        paintutils.drawImage(diamond, 10, 2)
+        paintutils.drawImage(diamond, 20, 2)
+        paintutils.drawImage(diamond, 30, 2)
+        paintutils.drawImage(diamond, 40, 2)
+        paintutils.drawImage(diamond, termX - 8, 2)
 
-        paintutils.drawImage(diamond,2, 7)
-        paintutils.drawImage(diamond,2, 13)
-        paintutils.drawImage(diamond,termX-8, 7)
-        paintutils.drawImage(diamond,termX-8, 13)
-        paintutils.drawImage(diamond,2, 19)
-        paintutils.drawImage(diamond,10, 19)
-        paintutils.drawImage(diamond,20, 19)
-        paintutils.drawImage(diamond,30, 19)
-        paintutils.drawImage(diamond,40, 19)
-        paintutils.drawImage(diamond,termX-8, 19)
+        paintutils.drawImage(diamond, 2, 7)
+        paintutils.drawImage(diamond, 2, 13)
+        paintutils.drawImage(diamond, termX - 8, 7)
+        paintutils.drawImage(diamond, termX - 8, 13)
+        paintutils.drawImage(diamond, 2, 19)
+        paintutils.drawImage(diamond, 10, 19)
+        paintutils.drawImage(diamond, 20, 19)
+        paintutils.drawImage(diamond, 30, 19)
+        paintutils.drawImage(diamond, 40, 19)
+        paintutils.drawImage(diamond, termX - 8, 19)
         sleep(0.5)
     end
     sleep(1)
@@ -222,8 +238,33 @@ local function pay(number)
 end
 
 --drawBox(1, 1, termX, termY, colors.green)
-term.setBackgroundColor(colors.green)
-term.clear()
+
+
+local function readkb()
+    local string = ""
+    local event, key
+    local x, y = term.getCursorPos()
+    while true do
+        term.setCursorPos(x, y)
+        term.write(string)
+        repeat
+            event, key = os.pullEvent()
+        until event == "key" or event == "char"
+        if event == "char" then
+            string = string .. key
+        elseif event == "key" then
+            if key == keys.backspace then
+                --remove from text entry
+                string = string:sub(1, -2)
+                term.setCursorPos(x, y)
+                term.write("         ")
+            elseif key == keys.enter or key == keys.numPadEnter then
+                --set creds
+                return string
+            end
+        end
+    end
+end
 
 function insert_amount()
     amount = 1
@@ -256,36 +297,50 @@ function insert_amount()
         term.setBackgroundColor(colors.green)
         term.setTextColor(colors.white)
 
-        term.setCursorPos(18, 7)
-        centerText("Credits: \167" .. tostring(credits))
+        term.setCursorPos(22, 7)
+        term.write("Credits: ")
+        term.setTextColor(colors.lime)
+        term.write("\167" .. tostring(credits))
+        term.setTextColor(colors.white)
 
-        term.setCursorPos(18, 8)
-        centerText("Max Bet: \167" .. tostring(limit))
-        term.setCursorPos(18, 9)
-        centerText("Enter -1 to quit")
+        term.setCursorPos(22, 9)
+        term.write("Max Bet: ")
+        term.setTextColor(colors.blue)
+        term.write("\167" .. tostring(limit))
+        term.setTextColor(colors.white)
+        term.setCursorPos(18, 10)
+        term.write("Min JackPot Bet: ")
+        term.setTextColor(colors.red)
+        term.write("\167" .. tostring(limit / 2))
+        term.setTextColor(colors.white)
+        term.setCursorPos(18, 12)
+        centerText("Enter 0 to quit")
 
         drawRandomImage(2, 7)
         drawRandomImage(2, 13)
-        drawRandomImage(termX-8, 7)
-        drawRandomImage(termX-8, 13)
+        drawRandomImage(termX - 8, 7)
+        drawRandomImage(termX - 8, 13)
         drawRandomImage(2, 19)
         drawRandomImage(10, 19)
         drawRandomImage(20, 19)
         drawRandomImage(30, 19)
         drawRandomImage(40, 19)
-        drawRandomImage(termX-8, 19)
+        drawRandomImage(termX - 8, 19)
 
         term.setBackgroundColor(colors.green)
-        term.setCursorPos(18, 12)
+        term.setCursorPos(18, 14)
+        term.setTextColor(colors.black)
         centerText("Bet Amount: \167")
-        amount = tonumber(io.read())
-
-        if amount == -1 then
-            quit = true
-            return
-        end
-        if amount >= 0 and amount <= credits and amount <= limit then
-            break
+        amount = tonumber(string.format("%.1f", tonumber(readkb())))
+        term.setTextColor(colors.white)
+        if amount ~= nil then
+            if amount == 0 then
+                quit = true
+                return
+            end
+            if amount >= 1 and amount <= credits and amount <= limit then
+                break
+            end
         end
     end
     --creds = creds - amount
@@ -300,8 +355,21 @@ end
 
 function slotmachiene()
     --drawBox(1, 1, termX, termY, colors.green)
-    term.setBackgroundColor(colors.green)
+    --term.setBackgroundColor(colors.green)
     term.clear()
+    term.setCursorPos(1, 1)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.clearLine()
+    centerText("Schindler Slots")
+    term.setBackgroundColor(colors.blue)
+    term.setCursorPos(1, 2)
+    term.clearLine()
+    term.setTextColor(colors.red)
+    centerText("JACKPOT \167" .. tostring(jackpot))
+    term.setBackgroundColor(colors.green)
+    term.setTextColor(colors.white)
+
     drawBox(5, 1, 46, 19, colors.lightGray)
     drawLine(5, 1, 5, 19, colors.white)
     drawLine(19, 1, 19, 19, colors.white)
@@ -309,6 +377,10 @@ function slotmachiene()
     drawLine(47, 1, 47, 19, colors.white)
     drawLine(2, 10, 5, 10, colors.gray)
     drawLine(47, 10, 50, 10, colors.gray)
+    term.setCursorPos(1, 22)
+    term.setTextColor(colors.red)
+    centerText("Bet: " .. tostring(amount))
+    term.setTextColor(colors.white)
 end
 
 function result()
@@ -337,63 +409,75 @@ end
 
 function random_1()
     drawBox(6, 1, 18, 19, colors.lightGray)
+    local result
     for i = 1, 3 do
         h = (i * 6) - 4
         nr1 = math.random(100)
         if nr1 < b then
             drawImage(diamond, 8, h)
+            result = diamond
         elseif nr1 < c then
             drawImage(bell, 8, h)
+            result = bell
         elseif nr1 < d then
             drawImage(seven, 8, h)
+            result = seven
         elseif nr1 < e then
             drawImage(dollar, 8, h)
+            result = dollar
         elseif nr1 < f then
             drawImage(orange, 8, h)
+            result = orange
         elseif nr1 <= 100 then
             drawImage(none, 8, h)
+            result = none
         end
     end
+    return result
 end
 
-function random_2()
+function random_2(last)
     drawBox(20, 1, 32, 19, colors.lightGray)
     for i = 4, 6 do
         h = ((i - 3) * 6) - 4
         nr2 = math.random(100)
-        if nr2 < b then
+        if nr2 < b and last ~= diamond then
             drawImage(diamond, 22, h)
-        elseif nr2 < c then
+        elseif nr2 < c and last ~= bell then
             drawImage(bell, 22, h)
-        elseif nr2 < d then
+        elseif nr2 < d and last ~= seven then
             drawImage(seven, 22, h)
-        elseif nr2 < e then
+        elseif nr2 < e and last ~= dollar then
             drawImage(dollar, 22, h)
-        elseif nr2 < f then
+        elseif nr2 < f and last ~= orange then
             drawImage(orange, 22, h)
         elseif nr2 <= 100 then
+            drawImage(none, 22, h)
+        else
             drawImage(none, 22, h)
         end
     end
 end
 
-function random_3()
+function random_3(last)
     drawBox(34, 1, 46, 19, colors.lightGray)
     for i = 7, 9 do
         h = ((i - 6) * 6) - 4
         nr3 = math.random(100)
-        if nr3 < b then
+        if nr3 < b and last ~= diamond then
             drawImage(diamond, 36, h)
-        elseif nr3 < c then
+        elseif nr3 < c and last ~= diamond then
             drawImage(bell, 36, h)
-        elseif nr3 < d then
+        elseif nr3 < d and last ~= diamond then
             drawImage(seven, 36, h)
-        elseif nr3 < e then
+        elseif nr3 < e and last ~= diamond then
             drawImage(dollar, 36, h)
-        elseif nr3 < f then
+        elseif nr3 < f and last ~= diamond then
             drawImage(orange, 36, h)
-        elseif nr3 <= 100 then
+        elseif nr3 <= 100 and last ~= diamond then
             drawImage(none, 36, h)
+        else
+            drawImage(none, 22, h)
         end
     end
 end
@@ -466,6 +550,9 @@ function roll()
     elseif price == 5 then
         drawBox(34, 7, 46, 13, colors.lightGray)
         drawImage(orange, 36, 8)
+    else
+        drawBox(34, 7, 46, 13, colors.lightGray)
+        drawImage(none, 36, 8)
     end
     playAudio("row.dfpwm")
     sleep(0.5)
@@ -475,9 +562,12 @@ function pricewon()
     --creds = creds + priceamount
 
 
-    if multeplier == 2 then
+    if multeplier == 2 and amount >= limit / 2 then
         drawJackpot()
         priceamount = amount + jackpot
+        if jackpot < amount * multeplier then
+            priceamount = priceamount + (amount * multeplier)
+        end
         setJackpot(0)
     else
         priceamount = amount * multeplier
@@ -492,8 +582,38 @@ function pricewon()
         term.clear()
         term.setCursorPos(1, 11)
         centerText("Winner!")
-        term.setCursorPos(1, 13)
-        centerText("\167" .. priceamount .. " Credits")
+        term.setCursorPos(22, 13)
+        centerText("Credits Won")
+        term.setCursorPos(22, 14)
+        term.setTextColor(colors.lime)
+        centerText("\167" .. priceamount)
+        term.setTextColor(colors.white)
+        --paintutils.drawImage(dollar, 2, 2)
+        paintutils.drawImage(dollar, 10, 2)
+        paintutils.drawImage(dollar, 20, 2)
+        paintutils.drawImage(dollar, 30, 2)
+        paintutils.drawImage(dollar, 40, 2)
+        --paintutils.drawImage(dollar, termX - 8, 2)
+
+        paintutils.drawImage(dollar, 2, 7)
+        paintutils.drawImage(dollar, 2, 13)
+        paintutils.drawImage(dollar, termX - 8, 7)
+        paintutils.drawImage(dollar, termX - 8, 13)
+        --paintutils.drawImage(dollar, 2, 19)
+        paintutils.drawImage(dollar, 10, 19)
+        paintutils.drawImage(dollar, 20, 19)
+        paintutils.drawImage(dollar, 30, 19)
+        paintutils.drawImage(dollar, 40, 19)
+        --paintutils.drawImage(dollar, termX - 8, 19)
+        term.setBackgroundColor(colors.blue)
+
+        if multeplier == 2 and amount < limit / 2 then
+            term.setCursorPos(1, 15)
+            term.setTextColor(colors.red)
+            centerText("You could have won the JackPot!")
+            term.setTextColor(colors.white)
+        end
+
         playAudio("win.dfpwm")
     elseif multeplier < 1 then
         setJackpot(jackpot + (amount / 4))
@@ -508,54 +628,84 @@ function pricewon()
     term.setCursorPos(16, 17)
     centerText("Press any key to continue")
     os.pullEvent("key")
-    sleep(0.2)
+    drawTransition()
+    --sleep(0.2)
 end
 
 function lever()
     --drawBox(1, 1, 51, 19, colors.green)
-    term.setBackgroundColor(colors.green)
-    term.clear()
+    --term.setBackgroundColor(colors.green)
+    slotmachiene()
+    random_1()
+    random_2()
+    random_3()
     term.setCursorPos(1, 11)
-    centerText("Press any key to roll")
-
+    term.setBackgroundColor(colors.black)
+    centerText("Press any key to pull lever")
+    term.setBackgroundColor(colors.green)
     os.pullEvent("key")
     playAudio("lever-pull.dfpwm")
     sleep(1)
 end
 
-local function testRun(runs, jackpotNumber)
+local function testRun(runs, jackpotNumber, cost)
+    print()
     jackpot = jackpotNumber
     local jp = 0
     local onep75 = 0
     local onep5 = 0
     local onep25 = 0
     local one = 0
+    local two = 0
     local zero = 0
-    local cost = 50
     local total = 0
+    local maxJackpot = 0
+
+    if cost == nil then
+        cost = limit / 2
+    end
 
     local results = {}
     for i = 1, runs do
         total = total - cost
         result()
-        total = total + (cost * multeplier)
-        table.insert(results, multeplier)
+        --print(tostring(multeplier))
+        --table.insert(results, multeplier)
         if multeplier == 0 then
             zero = zero + 1
-            jackpot = jackpot + ((cost * multeplier) / 4)
+            jackpot = jackpot + ((cost) / 4)
+            if jackpot > maxJackpot then
+                maxJackpot = jackpot
+            end
+            total = total + (cost * multeplier)
         elseif multeplier == 1 then
             one = one + 1
+            total = total + (cost * multeplier)
         elseif multeplier == 2 then
             total = total - (cost * multeplier)
-            total = total + jackpot
-            jackpot = 0
-            jp = jp + 1
+            if cost >= (limit / 2) then
+                total = total + jackpot
+                if jackpot < (cost * multeplier) then
+                    total = total + (cost * multeplier)
+                    two = two + 1
+                else
+                    total = total + cost
+                end
+                jackpot = 0
+                jp = jp + 1
+            else
+                total = total + (cost * multeplier)
+                two = two + 1
+            end
         elseif multeplier == 1.25 then
             onep25 = onep25 + 1
+            total = total + (cost * multeplier)
         elseif multeplier == 1.5 then
             onep5 = onep5 + 1
+            total = total + (cost * multeplier)
         elseif multeplier == 1.75 then
             onep75 = onep75 + 1
+            total = total + (cost * multeplier)
         end
     end
     local net = total + (runs * cost)
@@ -568,28 +718,50 @@ local function testRun(runs, jackpotNumber)
     debugLog("1.25: " .. tostring(onep25) .. " | " .. tostring((onep25 / runs) * 100) .. "%")
     debugLog("1.5: " .. tostring(onep5) .. " | " .. tostring((onep5 / runs) * 100) .. "%")
     debugLog("1.75: " .. tostring(onep75) .. " | " .. tostring((onep75 / runs) * 100) .. "%")
-    debugLog("jackpot: " .. tostring(jp) .. " | " .. tostring((jp / runs) * 100) .. "% Left: " .. tostring(jackpot) )
+    debugLog("2: " .. tostring(two) .. " | " .. tostring((two / runs) * 100) .. "%")
+    debugLog("jackpot: " .. tostring(jp) .. " | " .. tostring((jp / runs) * 100) .. "% Left: " .. tostring(jackpot))
     debugLog("Total: " .. tostring(total) .. " Cost: " .. tostring(runs * cost) .. " Net: " .. tostring(net))
     debugLog("Winning %: " .. tostring(100 + (total / (runs * cost) * 100)))
+
+    print("Bet: " .. tostring(cost))
+    print("Jackpot Left: " .. tostring(jackpot))
+    print("maxJackpot: " .. tostring(maxJackpot))
     print("Winning %: " .. tostring(100 + (total / (runs * cost) * 100)))
-    
 
     --drawJackpot()
     jackpot = 0
+    sleep(2)
 end
 
+-- Start Game
+term.setBackgroundColor(colors.gray)
+term.clear()
+paintutils.drawFilledBox(1, 7, termX, 11, colors.lightGray)
+term.setCursorPos(1, 8)
+term.setTextColor(colors.black)
+centerText("Schindler")
+term.setCursorPos(1, 10)
+term.setTextColor(colors.yellow)
+centerText("Slots")
+term.setTextColor(colors.white)
+sleep(3)
+drawTransition()
+term.setBackgroundColor(colors.green)
+--term.clear()
+
 if settings.get("debug") then
-    term.setCursorPos(1,1)
-    testRun(1000000,0)
-    testRun(1000000,10000)
-    testRun(1000000,100000)
-    testRun(1000000,1000000)
+    term.setCursorPos(1, 1)
+    --testRun(1000000, 0)
+    --testRun(1000000, 0, 1)
+    --testRun(1000000, 10000)
+    --testRun(1000000,100000)
+    --testRun(1000000,1000000)
     --playAudio("coins-handling.dfpwm")
     --playAudio("slotmachiene.dfpwm")
     --playAudio("win.dfpwm")
     --playAudio("lose.dfpwm")
     --playAudio("lever-pull.dfpwm")
-    sleep(5)
+    --sleep(5)
 end
 
 ---------------------

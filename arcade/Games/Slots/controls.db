@@ -1,6 +1,22 @@
 {
   {
-    key = "Q",
-    discription = "Quit",
+    key = "JackPot or 2x",
+    discription = "3 Diamonds",
+  },
+  {
+    key = "1.75x",
+    discription = "3 7s",
+  },
+  {
+    key = "1.5x",
+    discription = "3 $s",
+  },
+  {
+    key = "1.25x",
+    discription = "3 Bells",
+  },
+  {
+    key = "1x",
+    discription = "3 Oranges",
   },
 }

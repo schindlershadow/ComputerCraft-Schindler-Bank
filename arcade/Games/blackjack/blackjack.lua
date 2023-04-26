@@ -6,10 +6,31 @@ local id = 0
 local cash = 0
 local total = 0
 local termX, termY = term.getSize()
-local diskdrive = peripheral.wrap(settings.get("diskdrive"))
+local speaker = peripheral.wrap("top")
 term.setBackgroundColor(colors.gray)
 term.setTextColor(colors.white)
 term.clear()
+
+--Play audioFile on speaker
+local function playAudio(audioFile)
+  if fs.exists(audioFile) then
+    local dfpwm = require("cc.audio.dfpwm")
+    speaker.stop()
+    local decoder = dfpwm.make_decoder()
+    for chunk in io.lines(audioFile, 16 * 1024) do
+      local buffer = decoder(chunk)
+      while not speaker.playAudio(buffer, 1) do
+        os.pullEvent("speaker_audio_empty")
+      end
+    end
+  end
+end
+
+--Play tune on speakers
+local function playSounds(instrument, reversed)
+  local rand = math.random(24)
+  speaker.playNote(instrument, 1, rand)
+end
 
 local function getCredits()
   cash = 0
@@ -49,6 +70,7 @@ analysis = {}
 
 
 function shuffle()
+  playAudio("shuffle.dfpwm")
   faceCount = 0
   term.setBackgroundColor(colors.green)
   term.clear()
@@ -56,31 +78,32 @@ function shuffle()
   term.setTextColor(colors.white)
   center("Shuffling deck...")
   cards = {
-    "A", "A", "A", "A",
-    "J", "J", "J", "J",
-    "K", "K", "K", "K",
-    "Q", "Q", "Q", "Q",
-    "2", "2", "2", "2",
-    "3", "3", "3", "3",
-    "4", "4", "4", "4",
-    "5", "5", "5", "5",
-    "6", "6", "6", "6",
-    "7", "7", "7", "7",
-    "8", "8", "8", "8",
-    "9", "9", "9", "9",
-    "10", "10", "10", "10",
+    "A", "A", "A", "A", "A", "A", "A", "A",
+    "J", "J", "J", "J", "J", "J", "J", "J",
+    "K", "K", "K", "K", "K", "K", "K", "K",
+    "Q", "Q", "Q", "Q", "Q", "Q", "Q", "Q",
+    "2", "2", "2", "2", "2", "2", "2", "2",
+    "3", "3", "3", "3", "3", "3", "3", "3",
+    "4", "4", "4", "4", "4", "4", "4", "4",
+    "5", "5", "5", "5", "5", "5", "5", "5",
+    "6", "6", "6", "6", "6", "6", "6", "6",
+    "7", "7", "7", "7", "7", "7", "7", "7",
+    "8", "8", "8", "8", "8", "8", "8", "8",
+    "9", "9", "9", "9", "9", "9", "9", "9",
+    "10", "10", "10", "10", "10", "10", "10", "10",
   }
   local symbols = { "\4", "\5", "\6" }
   term.setCursorPos(1, 10)
   deck = {}
   for i, v in pairs(cards) do
     repeat
-      pos = math.random(1, 52)
+      pos = math.random(1, #cards)
       write(symbols[math.random(1, 3)])
     until deck[pos] == nil
     deck[pos] = v
     sleep(0)
   end
+  speaker.stop()
 end
 
 playerHand = {}
@@ -95,17 +118,21 @@ function countCard(sCard)
 end
 
 function dealSelf(hide)
+  playAudio("card.dfpwm")
   dealerHand[#dealerHand + 1] = deck[#deck]
   if not hide then
     countCard(deck[#deck])
   end
   deck[#deck] = nil
+  sleep(0.5)
 end
 
 function dealPlayer()
+  playAudio("card.dfpwm")
   playerHand[#playerHand + 1] = deck[#deck]
   countCard(deck[#deck])
   deck[#deck] = nil
+  sleep(0.5)
 end
 
 function drawCard(card, x, y)
@@ -195,7 +222,8 @@ function redraw()
   term.setBackgroundColor(colors.green)
   term.clear()
   term.setTextColor(colors.white)
-  spacing = 25 - (#dealerHand * 2)
+  --spacing = 25 - (#dealerHand * 2)
+  spacing = 29 - (#dealerHand * 2)
   for i, v in pairs(dealerHand) do
     if dealerShowing or i == 1 then
       drawCard(v, spacing, 3)
@@ -204,7 +232,8 @@ function redraw()
     end
     spacing = spacing + 4
   end
-  spacing = 25 - (#playerHand * 2)
+  --spacing = 25 - (#playerHand * 2)
+  spacing = 29 - (#playerHand * 2)
   for i, v in pairs(playerHand) do
     if i == #playerHand and doubled and not dealerShowing then
       drawCard("flipped", spacing, 13)
@@ -311,6 +340,7 @@ function winAnim()
   end
   term.setTextColor(colors.yellow)
   term.setBackgroundColor(colors.black)
+  playAudio("win.dfpwm")
   for i = 1, 40 do
     for x, v in pairs(dollars) do
       if v >= 1 and v <= termX then
@@ -325,10 +355,11 @@ function winAnim()
     end
     sleep(0.1)
   end
-  for i = 1, 19 do
+  for i = 1, termY do
     paintutils.drawLine(1, i, termX, i, colors.green)
     sleep(0)
   end
+  speaker.stop()
 end
 
 function log(str)
@@ -400,13 +431,13 @@ function playHand()
       paintutils.drawFilledBox(10, 21, 39, 21, colors.green)
       term.setCursorPos(18, 22)
       term.setTextColor(colors.white)
-      center("Bet -1 to exit")
+      center("Bet 0 to exit")
       term.setCursorPos(18, 21)
       term.setTextColor(colors.white)
       write("Bet: ")
       bet = 0
-      bet = tonumber(string.format("%.2f", tonumber(readkb())))
-      if bet == -1 then
+      bet = tonumber(string.format("%.1f", tonumber(readkb())))
+      if bet == 0 then
         quit = true
         return
       end
@@ -416,8 +447,10 @@ function playHand()
       if bet > tonumber(settings.get("maxBet")) then
         bet = tonumber(settings.get("maxBet"))
       end
-    until bet <= cash and bet >= 0
+    until bet <= cash and bet >= 1
     pay(bet)
+    playAudio("chips.dfpwm")
+    sleep(0.5)
   end
   if not splitCard then
     dealPlayer()
@@ -493,6 +526,7 @@ function playHand()
     sleep(0.2)
   end
   buttons = false
+  playAudio("card.dfpwm")
   dealerShowing = true
   countCard(dealerHand[2])
   if continue then
@@ -508,7 +542,9 @@ function playHand()
       end
     end
   end
+  playAudio("card.dfpwm")
   redraw()
+  sleep(0.5)
   if blackJack then
     --cash = cash + (bet * 1.5)
     pay(-1 * (bet + (bet * 1.5)))
@@ -676,11 +712,12 @@ local function onStart()
 
   sleep(3)
   faceCount = 0
-  for i = 1, 19 do
+  for i = 1, termY do
     paintutils.drawFilledBox(1, i, termX, i, colors.green)
     sleep(0)
   end
 
+  --sleep(0.5)
   shuffle()
 
   while not quit do
@@ -695,4 +732,3 @@ end
 
 --Main loop
 onStart()
-
