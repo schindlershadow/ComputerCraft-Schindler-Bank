@@ -379,7 +379,7 @@ function slotmachiene()
     drawLine(47, 10, 50, 10, colors.gray)
     term.setCursorPos(1, 22)
     term.setTextColor(colors.red)
-    centerText("Bet: " .. tostring(amount))
+    centerText(" Bet: " .. tostring(amount) .. " ")
     term.setTextColor(colors.white)
 end
 
