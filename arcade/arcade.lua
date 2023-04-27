@@ -757,6 +757,10 @@ local function onStart()
     drawMainMenu()
 end
 
+local function startupProgram()
+    shell.run(settings.get("startupProgram"))
+end
+
 loadingScreen("Arcade is loading")
 checkUpdates()
 
@@ -765,6 +769,10 @@ print("Client is loading, please wait....")
 --Staggered launch
 if not settings.get("debug") then
     sleep((1 + math.random(30)))
+end
+
+if settings.get("startupProgram") ~= nil then
+    os.startThread(startupProgram)
 end
 --Main loop
 --cryptoNet.startEventLoop(onStart, onEvent)

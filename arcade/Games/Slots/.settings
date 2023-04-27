@@ -1,6 +1,6 @@
 {
   debug = false,
-  maxBet = 5,
+  maxBet = 50,
   enableTouch = false,
   cost = 0,
   description = "Slot Machine",
@@ -13,4 +13,6 @@
   outputDropper = "minecraft:dropper_25",
   diskdrive = "drive_21",
   gameName = "Slots",
+  startupProgram = "jackpotMonitor",
+  startupMonitor = "monitor_24",
 }
