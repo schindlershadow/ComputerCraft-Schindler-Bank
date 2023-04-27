@@ -4,6 +4,7 @@ local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/m
 local arcadeServer
 local modemSide = "back"
 local modem = peripheral.wrap(modemSide)
+local termX, termY = term.getSize()
 
 if modem == nil then
     print("No Wireless Modem found")
@@ -71,7 +72,7 @@ function checkUpdates()
         print("Update found with SHA256: " .. tostring(latestCommit))
         -- Download the latest script file
         local startupURL = "https://raw.githubusercontent.com/" ..
-        owner .. "/" .. repo .. "/main/" .. githubFolder .. "/" .. githubFilename
+            owner .. "/" .. repo .. "/main/" .. githubFolder .. "/" .. githubFilename
         local response = http.get(startupURL)
         local data = response.readAll()
         response.close()
@@ -136,13 +137,40 @@ local function debugLog(text)
 end
 
 local function connectToArcadeServer()
-    term.setCursorPos(1, 1)
+    term.setBackgroundColor(colors.gray)
     term.clear()
-    print("Put this Pocket Computer in your offhand and enter the code displayed on the monitor: ")
+    term.setCursorPos(1, 1)
+    term.setBackgroundColor(colors.black)
+    term.clearLine()
+    centerText("Schindler Controller")
+    term.setBackgroundColor(colors.gray)
+    term.setCursorPos(1, 3)
+    term.write("Throw your Floppy disk")
+    term.setCursorPos(1, 4)
+    term.write("into the hopper")
+    term.setCursorPos(1, 6)
+    term.write("Put this Pocket Computer")
+    term.setCursorPos(1, 7)
+    term.write("in your offhand")
+    term.setCursorPos(1, 9)
+    term.write("Enter the code displayed")
+    term.setCursorPos(1, 10)
+    term.write("on the monitor")
+    term.setCursorPos(1, 12)
+    term.write("Enter 0 to exit")
+    paintutils.drawFilledBox(1, termY, 6, termY, colors.darkGrey)
+    term.setCursorPos(1, termY)
+    term.write("CODE: ")
+    paintutils.drawFilledBox(7, termY, termX, termY, colors.white)
+    term.setCursorPos(8, termY)
+    term.setTextColor(colors.black)
     local input = read()
     local code = tonumber(input)
+    term.setTextColor(colors.white)
+
     if code == nil then
-        connectToArcadeServer()
+        return
+    elseif code == 0 or code < 1000 or code > 9999 then
         return
     end
     rednet.broadcast(code)
@@ -172,8 +200,15 @@ local function connectToArcadeServer()
         term.setBackgroundColor(colors.black)
         term.clear()
         term.setCursorPos(1, 1)
-        print("Controls")
-        print("")
+        term.setBackgroundColor(colors.blue)
+        term.clearLine()
+        centerText("Schindler Controller")
+        term.setCursorPos(1, 2)
+        term.setBackgroundColor(colors.gray)
+        term.clearLine()
+        centerText("Controls")
+        term.setBackgroundColor(colors.black)
+        term.setCursorPos(1, 3)
         for k, v in pairs(controls) do
             if v ~= nil and v.key ~= nil and v.discription ~= nil then
                 print(tostring(v.discription) .. ": " .. tostring(v.key))
@@ -248,7 +283,6 @@ local function drawHelp()
     term.setCursorPos(1, 1)
     term.setBackgroundColor(colors.black)
     term.clearLine()
-    term.setBackgroundColor(colors.black)
     centerText("Schindler Controller")
     term.setBackgroundColor(colors.gray)
     term.setCursorPos(1, 3)
