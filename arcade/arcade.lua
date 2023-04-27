@@ -417,6 +417,7 @@ local function userMenu()
             --Close connection to controller
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
+                controllerSocket = nil
             end
             sleep(5)
         end
@@ -433,6 +434,7 @@ local function userMenu()
             --Close connection to controller
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
+                controllerSocket = nil
             end
             sleep(5)
         end
@@ -679,6 +681,7 @@ local function onEvent(event)
         elseif event[2] == timeoutConnectController then
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
+                controllerSocket = nil
             end
             os.queueEvent("rednet_message", 0, "timeoutConnectController")
             dumpDisk()
