@@ -1,7 +1,8 @@
 local githubFilename = "atm.lua"
 local githubFolder = "ATM"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
-local SHA_256_URL = "https://pastebin.com/raw/gsFrNjbt"
+local controllerURL =
+"https://raw.githubusercontent.com/schindlershadow/ComputerCraft-Schindler-Bank/main/controller.lua"
 local dropperRedstoneSide = "right"
 local doorRedstoneSide = "left"
 local speaker = peripheral.wrap("top")
@@ -12,6 +13,7 @@ local controllerSocket = nil
 local hopper, dropper, monitor, diskdrive, wiredModem, wirelessModem
 local credits = 0
 local width, height
+local allowHopper = false
 
 settings.define("clientName",
     { description = "The hostname of this client", "client" .. tostring(os.getComputerID()), type = "string" })
@@ -74,7 +76,7 @@ function checkUpdates()
     local filepath = "startup.lua"
     -- Get the latest commit hash from the repository
     local commiturl = "https://api.github.com/repos/" ..
-    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
+        owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
     local commitresponse = http.get(commiturl)
     if type(commitresponse) == "nil" then
         print("Failed to check for update")
@@ -106,7 +108,8 @@ function checkUpdates()
     if currentCommit ~= latestCommit then
         print("Update found with SHA256: " .. tostring(latestCommit))
         -- Download the latest script file
-        local startupURL = "https://raw.githubusercontent.com/" .. owner .. "/" .. repo .. "/main/".. githubFolder .. "/" .. githubFilename
+        local startupURL = "https://raw.githubusercontent.com/" ..
+            owner .. "/" .. repo .. "/main/" .. githubFolder .. "/" .. githubFilename
         local response = http.get(startupURL)
         local data = response.readAll()
         response.close()
@@ -173,6 +176,23 @@ local function debugLog(text)
     end
 end
 
+local function pullDisk(slot)
+    if hopper ~= nil and diskdrive ~= nil then
+        if hopper.getItemDetail(slot).name == "computercraft:disk" or hopper.getItemDetail(slot).name == "computercraft:pocket_computer_advanced" then
+            hopper.pushItems(peripheral.getName(diskdrive), slot, 1, 1)
+        else
+            print("Tried to pull nondisk item to disk drive")
+            debugLog("Tried to pull nondisk item to disk drive")
+        end
+    else
+        if hopper ~= nil then
+            print("pullDisk: Hopper is nil")
+        elseif diskdrive ~= nil then
+            print("pullDisk: diskdrive is nil")
+        end
+    end
+end
+
 local function dumpDropper()
     local itemList = dropper.list()
     local numOfItems = 0
@@ -225,25 +245,6 @@ local function dumpClientChest()
     dumpDropper()
 end
 
-local function pullDisk(slot)
-    if hopper ~= nil and diskdrive ~= nil then
-        local itemName = hopper.getItemDetail(slot).name
-        if itemName == "computercraft:disk" or itemName == "computercraft:pocket_computer_normal" or itemName == "computercraft:pocket_computer_advanced" then
-            hopper.pushItems(peripheral.getName(diskdrive), slot, 1, 1)
-            --Prevent malicious execution from diskdrive
-            if fs.exists("/" .. diskdrive.getMountPath() .. "/startup") then
-                fs.delete("/" .. diskdrive.getMountPath() .. "/startup")
-            end
-            if fs.exists("/" .. diskdrive.getMountPath() .. "/startup.lua") then
-                fs.delete("/" .. diskdrive.getMountPath() .. "/startup.lua")
-            end
-        else
-            error("Tried to pull nondisk item to disk drive")
-            debugLog("Tried to pull nondisk item to disk drive")
-        end
-    end
-end
-
 local function centerText(text)
     if text == nil then
         text = ""
@@ -267,14 +268,13 @@ local function loadingScreen(text)
     monitor.setCursorPos(1, 6)
 end
 
-local function getCredits(id)
+local function getCredits(user)
     credits = 0
     local event
-    cryptoNet.send(bankServerSocket, { "getCredits", id })
+    cryptoNet.send(bankServerSocket, { "getCredits", user })
     repeat
         event, credits = os.pullEvent("gotCredits")
     until event == "gotCredits"
-    diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: " .. tostring(credits))
     return credits
 end
 
@@ -321,17 +321,17 @@ local function pullItemsToClientChest()
     end
 end
 
-local function transferCredits(fromID, toID, amount)
+local function transferCredits(toUser, amount)
     local tmp = {}
-    tmp.fromID = fromID
-    tmp.toID = toID
+    tmp.fromUser = controllerSocket.username
+    tmp.toUser = toUser
     tmp.credits = amount
     local event, status
     cryptoNet.send(bankServerSocket, { "transfer", tmp })
     repeat
         event, status = os.pullEvent("gotTransfer")
     until event == "gotTransfer"
-    getCredits(fromID)
+    getCredits(controllerSocket.username)
     return status
 end
 
@@ -345,10 +345,10 @@ local function getValue()
 end
 
 local function depositItems()
-    local event, value
     local tmp = {}
-    tmp.chestName = settings.get("ClientChest")
-    tmp.id = diskdrive.getDiskID()
+    tmp.chestname = settings.get("ClientChest")
+    tmp.username = controllerSocket.username
+    local event, value
     cryptoNet.send(bankServerSocket, { "depositItems", tmp })
     repeat
         event = os.pullEvent("gotDepositItems")
@@ -360,7 +360,7 @@ local function valueMenu()
     local value = getValue()
     local done = false
     if value < 1 then
-        loadingScreen("Value of 0, Returning your items...")
+        loadingScreen("Value of 0")
         dumpClientChest()
         done = true
     end
@@ -373,25 +373,18 @@ local function valueMenu()
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
-        centerText("Your Items are worth #" .. tostring(value) .. " Credits")
+        centerText("Your Items are worth")
+        monitor.setCursorPos(1, 4)
+        centerText("\167" .. tostring(value) .. " Credits")
         monitor.setCursorPos(1, 5)
         centerText("Select an option")
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
-        monitor.setCursorPos(1, 8)
-        monitor.clearLine()
         centerText("1) Accept")
         monitor.setCursorPos(1, 9)
         monitor.clearLine()
-
-        monitor.setCursorPos(1, 11)
-        monitor.clearLine()
-        monitor.setCursorPos(1, 12)
-        monitor.clearLine()
         centerText("2) Cancel")
-        monitor.setCursorPos(1, 13)
-        monitor.clearLine()
 
         local event, key
         repeat
@@ -404,7 +397,7 @@ local function valueMenu()
             depositItems()
             playAudioDepositAccepted()
             dumpClientChest()
-            getCredits(diskdrive.getDiskID())
+            getCredits(controllerSocket.username)
             done = true
         elseif (key == keys.two or key == keys.numPad2 or key == keys.backspace) then
             --Cancel touched
@@ -415,8 +408,9 @@ local function valueMenu()
     end
 end
 
-local function depositMenu()
+local function depositMenu(username)
     local done = false
+    allowHopper = true
     while done == false do
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
@@ -432,19 +426,10 @@ local function depositMenu()
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
-        monitor.setCursorPos(1, 8)
-        monitor.clearLine()
         centerText("1) Done")
         monitor.setCursorPos(1, 9)
         monitor.clearLine()
-
-        monitor.setCursorPos(1, 11)
-        monitor.clearLine()
-        monitor.setCursorPos(1, 12)
-        monitor.clearLine()
         centerText("2) Cancel")
-        monitor.setCursorPos(1, 13)
-        monitor.clearLine()
 
         local event, key
         repeat
@@ -460,9 +445,10 @@ local function depositMenu()
             done = true
         end
     end
+    allowHopper = false
 end
 
-local function amountMenu(id)
+local function amountMenu(user)
     local done = false
     local amount = "0"
     while done == false do
@@ -474,44 +460,20 @@ local function amountMenu(id)
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 2)
         monitor.setBackgroundColor(colors.blue)
-        centerText("From: ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
+        centerText("From: " .. tostring(controllerSocket.username))
         monitor.setCursorPos(1, 3)
-        centerText("To: ID: " .. tostring(id))
-        monitor.setCursorPos(1, 5)
+        centerText("Total Credits: \167" .. tostring(credits))
+        monitor.setCursorPos(1, 4)
+        centerText("To: " .. tostring(user))
+        monitor.setCursorPos(1, 6)
         centerText("Amount: " .. tostring(amount))
         monitor.setBackgroundColor(colors.green)
-        monitor.setCursorPos(14, 7)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 8)
-        monitor.write(" 1 2 3 ")
-        monitor.setCursorPos(14, 9)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 10)
-        monitor.write(" 4 5 6 ")
-        monitor.setCursorPos(14, 11)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 12)
-        monitor.write(" 7 8 9 ")
-        monitor.setCursorPos(14, 13)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 14)
-        monitor.write("   0   ")
-
-        monitor.setCursorPos(1, 16)
+        monitor.setCursorPos(1, 7)
         monitor.clearLine()
-        monitor.setCursorPos(1, 17)
+        centerText("Enter) Accept")
+        monitor.setCursorPos(1, 9)
         monitor.clearLine()
-        centerText("A) Accept")
-        monitor.setCursorPos(1, 18)
-        monitor.clearLine()
-
-        monitor.setCursorPos(1, 20)
-        monitor.clearLine()
-        monitor.setCursorPos(1, 21)
-        monitor.clearLine()
-        centerText("E) Exit")
-        monitor.setCursorPos(1, 22)
-        monitor.clearLine()
+        centerText("Backspace) Exit")
 
         local event, key
         repeat
@@ -520,11 +482,11 @@ local function amountMenu(id)
 
         if event == "char" and (tonumber(key, 10) ~= nil) then
             amount = amount .. tostring(key)
-        elseif (key == keys.a or key == keys.enter or key == keys.numPadEnter) then
+        elseif (key == keys.enter or key == keys.numPadEnter) then
             --Accept touched
             local creditsToTransfer = tonumber(amount)
             if type(creditsToTransfer) == "number" then
-                local status = transferCredits(diskdrive.getDiskID(), id, creditsToTransfer)
+                local status = transferCredits(user, creditsToTransfer)
                 if status then
                     loadingScreen("Transfer Successful!")
                     sleep(2)
@@ -534,49 +496,18 @@ local function amountMenu(id)
                 end
             end
             done = true
-        elseif (key == keys.e or key == keys.backspace) then
+        elseif (key == keys.backspace) then
             --exit touched
             done = true
-        elseif y >= 8 and y <= 14 then
-            if amount == "0" then
-                amount = ""
-            end
-            if y == 8 then
-                if x == 14 + 1 then
-                    amount = amount .. "1"
-                elseif x == 14 + 3 then
-                    amount = amount .. "2"
-                elseif x == 14 + 5 then
-                    amount = amount .. "3"
-                end
-            elseif y == 10 then
-                if x == 14 + 1 then
-                    amount = amount .. "4"
-                elseif x == 14 + 3 then
-                    amount = amount .. "5"
-                elseif x == 14 + 5 then
-                    amount = amount .. "6"
-                end
-            elseif y == 12 then
-                if x == 14 + 1 then
-                    amount = amount .. "7"
-                elseif x == 14 + 3 then
-                    amount = amount .. "8"
-                elseif x == 14 + 5 then
-                    amount = amount .. "9"
-                end
-            elseif y == 14 then
-                if x == 14 + 3 then
-                    amount = amount .. "0"
-                end
-            end
         end
     end
 end
 
 local function transferMenu()
     local done = false
-    local id = "0"
+    local user = ""
+    --sleep to prevent double input
+    sleep(0.2)
     while done == false do
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
@@ -586,56 +517,33 @@ local function transferMenu()
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
-        centerText("From: ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
-        monitor.setCursorPos(1, 5)
-        centerText("To: ID: " .. tostring(id))
+        centerText("From: " .. tostring(controllerSocket.username))
+        monitor.setCursorPos(1, 4)
+        centerText("Total Credits: \167" .. tostring(credits))
+        monitor.setCursorPos(1, 6)
+        centerText("To: " .. tostring(user))
         monitor.setBackgroundColor(colors.green)
-        monitor.setCursorPos(14, 7)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 8)
-        monitor.write(" 1 2 3 ")
-        monitor.setCursorPos(14, 9)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 10)
-        monitor.write(" 4 5 6 ")
-        monitor.setCursorPos(14, 11)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 12)
-        monitor.write(" 7 8 9 ")
-        monitor.setCursorPos(14, 13)
-        monitor.write("       ")
-        monitor.setCursorPos(14, 14)
-        monitor.write("   0   ")
 
-        monitor.setCursorPos(1, 16)
+        monitor.setCursorPos(1, 8)
         monitor.clearLine()
-        monitor.setCursorPos(1, 17)
+        centerText("Enter) Accept")
+        monitor.setCursorPos(1, 10)
         monitor.clearLine()
-        centerText("A) Accept")
-        monitor.setCursorPos(1, 18)
-        monitor.clearLine()
-
-        monitor.setCursorPos(1, 20)
-        monitor.clearLine()
-        monitor.setCursorPos(1, 21)
-        monitor.clearLine()
-        centerText("E) Exit")
-        monitor.setCursorPos(1, 22)
-        monitor.clearLine()
+        centerText("Backspace) Exit")
 
         local event, key
         repeat
             event, key = os.pullEvent()
         until event == "key" or event == "char"
 
-        if event == "char" and (tonumber(key, 10) ~= nil) then
-            id = id .. tostring(key)
-        elseif (key == keys.a or key == keys.enter or key == keys.numPadEnter) then
-            --Accept touched
-            amountMenu(tonumber(id))
+        if event == "char" then
+            user = user .. tostring(key)
+        elseif (key == keys.enter or key == keys.numPadEnter) then
+            --Accept
+            amountMenu(user)
             done = true
-        elseif (key == keys.e or key == keys.backspace) then
-            --exit touched
+        elseif (key == keys.backspace) then
+            --exit
             done = true
             if id == "0" then
                 id = ""
@@ -708,67 +616,33 @@ end
 
 local function userMenu()
     local done = false
-
-    code = math.random(1000, 9999)
-    print("code: " .. tostring(code))
-    monitor.setBackgroundColor(colors.blue)
-    monitor.clear()
-    monitor.setCursorPos(1, 1)
-    monitor.setBackgroundColor(colors.black)
-    monitor.clearLine()
-    centerText("Code Connect")
-    monitor.setCursorPos(1, 3)
-    monitor.setBackgroundColor(colors.blue)
-    centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
-    monitor.setCursorPos(1, 12)
-    monitor.setTextColor(colors.white)
-    monitor.setBackgroundColor(colors.blue)
-    centerText("Connect Code: " .. tostring(code))
-    --timeout for controller to connect
-    timeoutConnectController = os.startTimer(20)
-
-    codeServer()
-    os.cancelTimer(timeoutConnectController)
-
-    --timeout for controller to connect
-    timeoutConnectController = os.startTimer(10)
-
     while done == false do
+        getCredits(controllerSocket.username)
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
         centerText("Schindler Bank ATM")
-        monitor.setCursorPos(1, 3)
+        monitor.setCursorPos(1, 2)
         monitor.setBackgroundColor(colors.blue)
-        centerText("ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
+        centerText("User: " .. tostring(controllerSocket.username))
+        monitor.setCursorPos(1, 3)
+        centerText("Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
         centerText("Select a transaction")
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
-        monitor.setCursorPos(1, 8)
-        monitor.clearLine()
         centerText("1) Deposit")
+
         monitor.setCursorPos(1, 9)
         monitor.clearLine()
+        centerText("2) Transfer")
 
         monitor.setCursorPos(1, 11)
         monitor.clearLine()
-        monitor.setCursorPos(1, 12)
-        monitor.clearLine()
-        centerText("2) Transfer")
-        monitor.setCursorPos(1, 13)
-        monitor.clearLine()
-
-        monitor.setCursorPos(1, 15)
-        monitor.clearLine()
-        monitor.setCursorPos(1, 16)
-        monitor.clearLine()
         centerText("3) Exit")
-        monitor.setCursorPos(1, 17)
-        monitor.clearLine()
 
         local event, key
         repeat
@@ -783,7 +657,7 @@ local function userMenu()
             transferMenu()
         elseif (key == keys.three or key == keys.numPad3 or key == keys.backspace) then
             --exit touched
-            drawDiskReminder()
+            --drawDiskReminder()
             playAudioExit()
             done = true
             dumpHopper()
@@ -791,53 +665,27 @@ local function userMenu()
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
             end
-            sleep(2)
+            --sleep(2)
         end
     end
-    dumpDisk()
-end
-
-local function diskChecker()
-    local id = diskdrive.getDiskID()
-    --check if disk id is registered
-    local event
-    local isRegistered = false
-    loadingScreen("Loading information from server...")
-    cryptoNet.send(bankServerSocket, { "checkID", id })
-    repeat
-        event, isRegistered = os.pullEvent("gotCheckID")
-    until event == "gotCheckID"
-
-    if isRegistered then
-        loadingScreen("User Found, Loading credits...")
-        --get credits from server
-        credits = getCredits(id)
-        --diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: " .. tostring(credits))
-        playAudioReturningCustomer()
-        userMenu()
-    else
-        --format disk and create user
-        loadingScreen("Creating new User...")
-        --ask server to setup new user
-        event = ""
-        cryptoNet.send(bankServerSocket, { "newID", id })
-        repeat
-            event = os.pullEvent("gotNewID")
-        until event == "gotNewID"
-        diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: 0")
-        loadingScreen("New User Created!")
-        playAudioNewCustomer()
-        sleep(1)
-        userMenu()
-    end
+    --monitor.clear()
+    --monitor.setCursorPos(1,1)
+    --sleep(1)
+    os.queueEvent("exit")
+    --dumpDisk()
 end
 
 local function writeControllerFile(slot)
+    print("Starting writeControllerFile")
+    print("Pulling pocket computer to diskdrive")
     pullDisk(slot)
-    local file = fs.open("controller.lua", "r")
-    local contents = file.readAll()
-    file.close()
 
+    print("Getting newest controller software")
+    local response = http.get(controllerURL)
+    local contents = response.readAll()
+    response.close()
+
+    --[[
     monitor.setBackgroundColor(colors.blue)
     monitor.clear()
     monitor.setCursorPos(1, 1)
@@ -849,7 +697,8 @@ local function writeControllerFile(slot)
     centerText("Pocket Computer Dectected!")
     monitor.setCursorPos(1, 5)
     centerText("Writing Controller software...")
-
+    --]]
+    print("Checking for free space")
     local freespace = fs.getFreeSpace(diskdrive.getMountPath())
 
     if type(freespace) == "number" then
@@ -865,7 +714,7 @@ local function writeControllerFile(slot)
     freespace = fs.getFreeSpace(diskdrive.getMountPath())
     if type(freespace) == "number" then
         if freespace < 10000 then
-            loadingScreen("No space on disk")
+            print("No space on disk")
             dumpDisk()
             dumpHopper()
             return
@@ -873,17 +722,21 @@ local function writeControllerFile(slot)
     end
 
 
-
+    print("Writting startup file")
     local startupFile = fs.open(diskdrive.getMountPath() .. "/startup.lua", "w")
     startupFile.write(contents)
     startupFile.close()
+    --[[
     monitor.setCursorPos(1, 7)
     centerText("Complete!")
     monitor.setCursorPos(1, 9)
     centerText("Make sure to restart")
+    --]]
+    print("Returning Pocket Computer")
     dumpDisk()
     dumpHopper()
 
+    --[[
     monitor.setCursorPos(1, 19)
     centerText("Dont forget your Pocket computer!")
     monitor.setCursorPos(1, 20)
@@ -891,13 +744,63 @@ local function writeControllerFile(slot)
     monitor.setCursorPos(1, 21)
     centerText("\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27")
     sleep(5)
+    ]]
+end
+
+--Background thread that will always write controller software on pocket computers
+local function controllerWriteHandler()
+    print("Starting controllerWriteHandler")
+    while true do
+        if hopper ~= nil then
+            local itemList = hopper.list()
+            if itemList ~= nil and allowHopper == false then
+                for slot, item in pairs(itemList) do
+                    debugLog(item.name)
+                    if item.name == "computercraft:pocket_computer_normal" or item.name == "computercraft:pocket_computer_advanced" then
+                        writeControllerFile(slot)
+                        --dumpHopper()
+                        --drawMonitor()
+                    else
+                        dumpHopper()
+                    end
+                end
+            end
+        else
+            print("Hopper is nil, check settings")
+        end
+        sleep(1)
+    end
+end
+
+local function loginScreen()
+    monitor.setBackgroundColor(colors.blue)
+    monitor.clear()
+    monitor.setCursorPos(1, 1)
+    monitor.setBackgroundColor(colors.black)
+    monitor.clearLine()
+    centerText("Schindler Bank ATM")
+    monitor.setCursorPos(1, 3)
+    monitor.setBackgroundColor(colors.blue)
+    centerText("Waiting for login")
+    monitor.setCursorPos(1, 5)
+    centerText("Please check your")
+    monitor.setCursorPos(1, 6)
+    centerText("pocket computer")
+
+    local event
+    repeat
+        event = os.pullEvent()
+    until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin"
+    print("loginScreen exit reason: " .. tostring(event))
 end
 
 local function drawMonitor()
-    monitor.setTextScale(0.5)
+    monitor.setTextScale(1)
     monitor.setCursorPos(1, 1)
 
     while true do
+        code = math.random(1000, 9999)
+        print("code: " .. tostring(code))
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
         monitor.setCursorPos(1, 1)
@@ -906,55 +809,25 @@ local function drawMonitor()
         centerText("Schindler Bank ATM")
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
-        centerText("Welcome to Schindler Bank!")
-        monitor.setCursorPos(1, 18)
-        centerText("Please insert Floppy Disk")
-        monitor.setCursorPos(1, 19)
-        centerText("Or Wireless Pocket Computer")
-        monitor.setCursorPos(1, 20)
-        centerText("\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26")
-        monitor.setCursorPos(1, 21)
-        centerText("\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26\26")
-        --Look for floppydisk
-        local diskSlot = 0
-        while diskSlot == 0 do
-            if hopper ~= nil then
-                local itemList = hopper.list()
-                if itemList ~= nil then
-                    for slot, item in pairs(itemList) do
-                        debugLog(item.name)
-                        if item.name == "computercraft:disk" then
-                            diskSlot = slot
-                        elseif item.name == "computercraft:pocket_computer_normal" or item.name == "computercraft:pocket_computer_advanced" then
-                            writeControllerFile(slot)
-                            dumpHopper()
-                            drawMonitor()
-                            return
-                        else
-                            dumpHopper()
-                        end
-                    end
-                else
-                    sleep(1)
-                end
-            end
-        end
-        pullDisk(diskSlot)
-        loadingScreen("Reading Disk...")
-        if not diskdrive.hasData() then
-            monitor.setBackgroundColor(colors.red)
-            monitor.clear()
-            monitor.setCursorPos(1, 2)
-            centerText("Error Reading Disk")
-            dumpDisk()
-            sleep(5)
-        else
-            redstone.setOutput(doorRedstoneSide, true)
-            diskChecker()
-            sleep(1)
-            redstone.setOutput(doorRedstoneSide, false)
-        end
-        --sleep(10)
+        centerText("Welcome to Schindler Bank")
+        monitor.setCursorPos(1, 6)
+        centerText("Please enter code")
+        monitor.setCursorPos(1, 7)
+        centerText("or insert Pocket Computer")
+        monitor.setCursorPos(1, 8)
+        centerText("into the hopper \25\25\25")
+
+        monitor.setCursorPos(1, 12)
+        monitor.setTextColor(colors.white)
+        monitor.setBackgroundColor(colors.blue)
+        centerText("Connect Code: " .. tostring(code))
+
+        codeServer()
+
+        --timeout for controller to connect
+        timeoutConnectController = os.startTimer(10)
+
+        loginScreen()
     end
 end
 
@@ -981,87 +854,181 @@ end
 
 --Cryptonet event handler
 local function onEvent(event)
-    if event[1] == "login" then
+    if event[1] == "login" or event[1] == "hash_login" then
         local username = event[2]
         -- The socket of the client that just logged in
         local socket = event[3]
         -- The logged-in username is also stored in the socket
         print(socket.username .. " just logged in.")
-        --timeout no longer needed
-        timeoutConnect = nil
-
         --cryptoNet.send(bankServerSocket, { "getServerType" })
-        getCraftingServerCert()
-        drawMonitor()
+
+        if event[1] == "hash_login" then
+            redstone.setOutput(doorRedstoneSide, true)
+            playAudioReturningCustomer()
+            userMenu()
+            redstone.setOutput(doorRedstoneSide, false)
+        end
+        if username == "ATM" then
+            --timeout no longer needed
+            os.cancelTimer(timeoutConnect)
+            timeoutConnect = nil
+            getCraftingServerCert()
+        else
+            --login from pocket computer
+            redstone.setOutput(doorRedstoneSide, true)
+            --accountChecker()
+            sleep(1)
+            redstone.setOutput(doorRedstoneSide, false)
+        end
     elseif event[1] == "encrypted_message" then
         local socket = event[3]
-        local message = event[2][1]
-        local data = event[2][2]
         if socket.username == nil then
             socket.username = "LAN Host"
         end
-        log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
-        if message == "newID" then
-            os.queueEvent("gotNewID")
-        elseif message == "checkID" then
-            os.queueEvent("gotCheckID", data)
-        elseif message == "getCredits" then
-            os.queueEvent("gotCredits", data)
-        elseif message == "getValue" then
-            os.queueEvent("gotValue", data)
-        elseif message == "depositItems" then
-            os.queueEvent("gotDepositItems")
-        elseif message == "transfer" then
-            os.queueEvent("gotTransfer", data)
-        elseif message == "controllerConnect" then
-            controllerSocket = socket
-            timeoutConnectController = nil
-            print("Controller connected")
-        elseif message == "keyPressed" then
-            if type(data[1]) == "number" then
-                if keys.getName(data[1]) ~= "nil" then
-                    debugLog("keyPressed key" .. keys.getName(data[1]) .. " is_held:" .. tostring(data[2]))
-                    os.queueEvent("key", data[1], data[2])
-                end
-            else
-                print("type(data[1]) ~= number")
-            end
-        elseif message == "keyReleased" then
-            if type(data[1]) == "number" then
-                if keys.getName(data[1]) ~= "nil" then
-                    debugLog("keyReleased key" .. keys.getName(data[1]))
-                    os.queueEvent("key_up", data[1])
-                end
-            else
-                print("type(data[1]) ~= number")
-            end
-        elseif message == "charPressed" then
-            if type(data[1]) == "string" then
-                debugLog("charPressed char" .. data[1])
-                os.queueEvent("char", data[1])
-            end
-        elseif message == "getControls" then
-            print("Controls requested")
-            local file = fs.open("controls.db", "r")
-            local contents = file.readAll()
-            file.close()
 
-            local decoded = textutils.unserialize(contents)
-            if type(decoded) == "table" and next(decoded) then
-                print("Controls Found")
-                cryptoNet.send(socket, { message, decoded })
-            else
-                print("Controls Not Found")
-                cryptoNet.send(socket, { {} })
+        if socket.username ~= "LAN Host" then
+            local message = event[2][1]
+            local data = event[2][2]
+            log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
+
+            if message == "keyPressed" then
+                if type(data[1]) == "number" then
+                    if keys.getName(data[1]) ~= "nil" then
+                        debugLog("keyPressed key" .. keys.getName(data[1]) .. " is_held:" .. tostring(data[2]))
+                        os.queueEvent("key", data[1], data[2])
+                    end
+                else
+                    print("type(data[1]) ~= number")
+                end
+            elseif message == "keyReleased" then
+                if type(data[1]) == "number" then
+                    if keys.getName(data[1]) ~= "nil" then
+                        debugLog("keyReleased key" .. keys.getName(data[1]))
+                        os.queueEvent("key_up", data[1])
+                    end
+                else
+                    print("type(data[1]) ~= number")
+                end
+            elseif message == "charPressed" then
+                if type(data[1]) == "string" then
+                    debugLog("charPressed char" .. data[1])
+                    os.queueEvent("char", data[1])
+                end
+            elseif message == "getControls" then
+                print("Controls requested")
+                local file = fs.open("controls.db", "r")
+                local contents = file.readAll()
+                file.close()
+
+                local decoded = textutils.unserialize(contents)
+                if type(decoded) == "table" and next(decoded) then
+                    print("Controls Found")
+                    cryptoNet.send(socket, { message, decoded })
+                else
+                    print("Controls Not Found")
+                    cryptoNet.send(socket, { {} })
+                end
+            elseif message == "checkPasswordHashed" then
+                os.queueEvent("gotCheckPasswordHashed", data, event[2][3])
+            elseif message == "getCertificate" then
+                --log("gotCertificate from: " .. socket.sender .. " target:"  )
+                os.queueEvent("gotCertificate", data)
+            elseif message == "newID" then
+                os.queueEvent("gotNewID")
+            elseif message == "checkID" then
+                os.queueEvent("gotCheckID", data)
+            elseif message == "getCredits" then
+                os.queueEvent("gotCredits", data)
+                if controllerSocket ~= nil then
+                    cryptoNet.send(controllerSocket, { message, data })
+                end
+            elseif message == "getValue" then
+                os.queueEvent("gotValue", data)
+            elseif message == "depositItems" then
+                os.queueEvent("gotDepositItems")
+            elseif message == "transfer" then
+                os.queueEvent("gotTransfer", data)
+            elseif message == "addUser" then
+                os.queueEvent("gotAddUser", event[2][2], event[2][3])
             end
-        elseif message == "getCertificate" then
-            --log("gotCertificate from: " .. socket.sender .. " target:"  )
-            os.queueEvent("gotCertificate", data)
+        else
+            --User is not logged in
+            local message = event[2][1]
+            local data = event[2][2]
+            if message == "controllerConnect" then
+                controllerSocket = socket
+                os.cancelTimer(timeoutConnectController)
+                timeoutConnectController = nil
+                print("Controller connected")
+            elseif message == "hashLogin" then
+                --Need to auth with server
+                --debugLog("hashLogin")
+                print("User login request for: " .. data.username)
+                log("User login request for: " .. data.username)
+                local tmp = {}
+                tmp.username = data.username
+                tmp.passwordHash = cryptoNet.hashPassword(data.username, data.password, settings.get("BankServer"))
+                tmp.servername = data.servername
+                data.password = nil
+                cryptoNet.send(bankServerSocket, { "checkPasswordHashed", tmp })
+
+                local event2
+                local loginStatus = false
+                local permissionLevel = 0
+                repeat
+                    event2, loginStatus, permissionLevel = os.pullEvent("gotCheckPasswordHashed")
+                until event2 == "gotCheckPasswordHashed"
+                --debugLog("loginStatus:"..tostring(loginStatus))
+                if loginStatus == true then
+                    cryptoNet.send(socket, { "hashLogin", true, permissionLevel })
+                    socket.username = data.username
+                    socket.permissionLevel = permissionLevel
+
+                    --Update internal sockets
+                    for k, v in pairs(server.sockets) do
+                        if v.target == socket.target then
+                            server.sockets[k] = socket
+                            server.sockets[k].username = data.username
+                            break
+                        end
+                    end
+                    controllerSocket.username = data.username
+
+                    os.queueEvent("hash_login", socket.username, socket)
+                else
+                    print("User: " .. data.username .. " failed to login")
+                    log("User: " .. data.username .. " failed to login")
+                    os.queueEvent("cancelLogin")
+                    cryptoNet.send(socket, { "hashLogin", false })
+                end
+            elseif message == "addUser" then
+                --ask server to setup new user
+                local event2
+                local status = false
+                cryptoNet.send(bankServerSocket, { "addUser", data })
+                repeat
+                    event2, status, reason = os.pullEvent("gotAddUser")
+                until event2 == "gotAddUser"
+                cryptoNet.send(controllerSocket, { "addUser", status, reason })
+                if status == true then
+                    loadingScreen("New User Created!")
+                    playAudioNewCustomer()
+                else
+                    loadingScreen("Failed to create user")
+                    monitor.write(reason)
+                end
+            elseif message == "cancelLogin" then
+                print("cancelLogin")
+                os.queueEvent("cancelLogin")
+                cryptoNet.close(controllerSocket)
+                controllerSocket = nil
+            end
         end
     elseif event[1] == "timer" then
         if event[2] == timeoutConnect or event[2] == timeoutConnectController then
             --Reboot after failing to connect
             loadingScreen("Failed to connect, rebooting...")
+            print("Failed to connect, rebooting...")
             cryptoNet.closeAll()
             dumpDisk()
             dumpHopper()
@@ -1073,6 +1040,7 @@ local function onEvent(event)
         --print(dump(event))
         --log(dump(event))
         loadingScreen("Connection lost, rebooting...")
+        print("Connection lost, rebooting...")
         cryptoNet.closeAll()
         dumpDisk()
         dumpHopper()
@@ -1139,16 +1107,21 @@ local function onStart()
     rednet.open(wirelessModem.side)
     print("Opening cryptoNet server")
     server = cryptoNet.host(settings.get("clientName"), true, false, wirelessModem.side)
+    drawMonitor()
 end
 
-checkUpdates()
+--checkUpdates()
 
 print("Client is loading, please wait....")
 
 cryptoNet.setLoggingEnabled(true)
 
---Staggered launch
-sleep(1 + math.random(30))
+if not settings.get("debug") then
+    --Staggered launch
+    sleep(1 + math.random(30))
+end
+
+os.startThread(controllerWriteHandler)
 
 --Main loop
 cryptoNet.startEventLoop(onStart, onEvent)

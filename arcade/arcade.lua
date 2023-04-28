@@ -9,8 +9,7 @@ local code = 0
 local wirelessModemSide = "left"
 local modemSide = "bottom"
 local monitorSide = "back"
-local redstoneSide = "right"
-local diskdrive, controllerSocket
+local controllerSocket
 local monitor = peripheral.wrap(monitorSide)
 local modem = peripheral.wrap(wirelessModemSide)
 
@@ -22,12 +21,6 @@ settings.define("launcher",
     { description = "The game launcher file", "game", type = "string" })
 settings.define("debug", { description = "Enables debug options", default = "false", type = "boolean" })
 settings.define("BankServer", { description = "bank server hostname", default = "minecraft:barrel_0", type = "string" })
-settings.define("inputHopper",
-    { description = "hopper used for this host", default = "minecraft:hopper_0", type = "string" })
-settings.define("outputDropper",
-    { description = "dropper used for this host", default = "minecraft:dropper_0", type = "string" })
-settings.define("diskdrive",
-    { description = "drive used for this host", default = "minecraft:dropper_0", type = "string" })
 settings.define("cost",
     { description = "amount of credits it costs to play game", default = 1, type = "number" })
 settings.define("description",
@@ -42,9 +35,6 @@ if settings.load() == false then
     settings.set("launcher", "game")
     settings.set("description", "A cool game")
     settings.set("cost", 1)
-    settings.set("diskdrive", "drive_0")
-    settings.set("inputHopper", "minecraft:hopper_0")
-    settings.set("outputDropper", "minecraft:dropper_0")
     settings.set("debug", false)
     print("Stop the host and edit .settings file with correct settings")
     settings.save()
@@ -180,16 +170,6 @@ local function debugLog(text)
 end
 
 local function centerText(text)
-    if text == nil then
-        text = ""
-    end
-    local x, y = term.getSize()
-    local x1, y1 = term.getCursorPos()
-    term.setCursorPos((math.floor(x / 2) - (math.floor(#text / 2))), y1)
-    term.write(text)
-end
-
-local function centerTextMonitor(monitor, text)
     if monitor ~= nil then
         if text == nil then
             text = ""
@@ -201,76 +181,17 @@ local function centerTextMonitor(monitor, text)
     end
 end
 
-local function drawDiskReminder()
+local function drawExit()
     monitor.setTextScale(1)
     monitor.setBackgroundColor(colors.blue)
     monitor.clear()
     monitor.setCursorPos(1, 1)
     monitor.setBackgroundColor(colors.black)
     monitor.clearLine()
-    centerTextMonitor(monitor, "Schindler Arcade:" .. settings.get("clientName"))
+    centerText("Schindler Arcade:" .. settings.get("clientName"))
     monitor.setCursorPos(1, 3)
     monitor.setBackgroundColor(colors.blue)
-    centerTextMonitor(monitor, "Thanks for playing!")
-    monitor.setCursorPos(1, 5)
-    centerTextMonitor(monitor, "Dont forget your Disk!")
-    monitor.setCursorPos(1, 10)
-    monitor.write("\25\25\25\25\25\25\25\25\25\25")
-    monitor.setCursorPos(1, 12)
-    monitor.write("\25\25\25\25\25\25\25\25\25\25")
-end
-
-local function dumpDropper()
-    local itemList = dropper.list()
-    local numOfItems = 0
-    if itemList ~= nil then
-        for slot, item in pairs(itemList) do
-            if item.name == "computercraft:disk" then
-                drawDiskReminder()
-            end
-            numOfItems = numOfItems + item.count
-        end
-    end
-    debugLog("numOfItems:" .. tostring(numOfItems))
-    redstone.setOutput(redstoneSide, false)
-    while numOfItems > 0 do
-        redstone.setOutput(redstoneSide, true)
-        pcall(sleep, 0.1)
-        redstone.setOutput(redstoneSide, false)
-        numOfItems = numOfItems - 1
-        pcall(sleep, 0.1)
-    end
-end
-
-local function dumpHopper()
-    if dropper ~= nil and hopper ~= nil then
-        local itemList = hopper.list()
-        for k, v in pairs(itemList) do
-            if v ~= nil and k ~= nil then
-                dropper.pullItems(peripheral.getName(hopper), k)
-                dumpDropper()
-            end
-        end
-    end
-    dumpDropper()
-end
-
-local function dumpDisk()
-    if dropper ~= nil and diskdrive ~= nil then
-        dropper.pullItems(peripheral.getName(diskdrive), 1)
-    end
-    dumpDropper()
-end
-
-local function pullDisk(slot)
-    if hopper ~= nil and diskdrive ~= nil then
-        if hopper.getItemDetail(slot).name == "computercraft:disk" then
-            hopper.pushItems(peripheral.getName(diskdrive), slot, 1, 1)
-        else
-            error("Tried to pull nondisk item to disk drive")
-            debugLog("Tried to pull nondisk item to disk drive")
-        end
-    end
+    centerText("Thanks for playing!")
 end
 
 local function loadingScreen(text)
@@ -280,23 +201,19 @@ local function loadingScreen(text)
     monitor.setBackgroundColor(colors.red)
     monitor.clear()
     monitor.setCursorPos(1, 2)
-    centerTextMonitor(monitor, text)
+    centerText(text)
     monitor.setCursorPos(1, 4)
-    centerTextMonitor(monitor, "Loading...")
+    centerText("Loading...")
     monitor.setCursorPos(1, 6)
 end
 
-local function getCredits(id)
-    if id == nil then
-        id = diskdrive.getDiskID()
-    end
+local function getCredits()
     credits = 0
     local event
-    cryptoNet.send(bankServerSocket, { "getCredits", settings.get("diskdrive") })
+    cryptoNet.send(bankServerSocket, { "getCredits", controllerSocket.username })
     repeat
         event, credits = os.pullEvent()
     until event == "gotCredits"
-    diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: " .. tostring(credits))
     return credits
 end
 
@@ -304,7 +221,7 @@ local function pay(amount)
     local event
     local status = false
     local tmp = {}
-    tmp.diskdrive = settings.get("diskdrive")
+    tmp.username = controllerSocket.username
     if amount == nil then
         tmp.amount = settings.get("cost")
     else
@@ -351,57 +268,33 @@ end
 
 local function userMenu()
     local done = false
-    code = math.random(1000, 9999)
-    print("code: " .. tostring(code))
-    monitor.setBackgroundColor(colors.blue)
-    monitor.clear()
-    monitor.setCursorPos(1, 1)
-    monitor.setBackgroundColor(colors.black)
-    monitor.clearLine()
-    centerTextMonitor(monitor, "Connect:" .. settings.get("clientName"))
-    monitor.setCursorPos(1, 3)
-    monitor.setBackgroundColor(colors.blue)
-    centerTextMonitor(monitor, "ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
-    monitor.setCursorPos(1, 12)
-    monitor.setTextColor(colors.white)
-    monitor.setBackgroundColor(colors.blue)
-    centerTextMonitor(monitor, "Connect Code: " .. tostring(code))
-    --timeout for controller to connect
-    timeoutConnectController = os.startTimer(20)
-
-    codeServer()
-    os.cancelTimer(timeoutConnectController)
-    timeoutConnectController = nil
-
-    --timeout for controller to connect
-    timeoutConnectController = os.startTimer(15)
-
     while done == false do
+        getCredits()
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
-        centerTextMonitor(monitor, "Schindler Arcade:" .. settings.get("clientName"))
+        centerText("Schindler Arcade:" .. settings.get("clientName"))
         monitor.setCursorPos(1, 3)
         monitor.setBackgroundColor(colors.blue)
-        centerTextMonitor(monitor, "ID: " .. tostring(diskdrive.getDiskID()) .. " Credits: \167" .. tostring(credits))
+        centerText("User: " .. tostring(controllerSocket.username) .. " Credits: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
         if settings.get("cost") <= 0 then
-            centerTextMonitor(monitor, "Free to play")
+            centerText("Free to play")
         elseif settings.get("cost") == 1 then
-            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
+            centerText("\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
         else
-            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
+            centerText("\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
         end
 
         monitor.setBackgroundColor(colors.green)
         monitor.setCursorPos(1, 7)
         monitor.clearLine()
-        centerTextMonitor(monitor, "1) Play " .. settings.get("gameName"))
+        centerText("1) Play " .. settings.get("gameName"))
         monitor.setCursorPos(1, 9)
         monitor.clearLine()
-        centerTextMonitor(monitor, "2) Exit")
+        centerText("2) Exit")
 
 
         local event, key, x, y
@@ -410,10 +303,8 @@ local function userMenu()
         until event == "key" or event == "timeoutConnectController"
 
         if event == "timeoutConnectController" then
-            drawDiskReminder()
+            drawExit()
             done = true
-            dumpDisk()
-            dumpHopper()
             --Close connection to controller
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
@@ -426,11 +317,9 @@ local function userMenu()
             playGame()
         elseif key == keys.two or key == keys.numPad2 then
             --exit pressed
-            drawDiskReminder()
+            drawExit()
 
             done = true
-            dumpDisk()
-            dumpHopper()
             --Close connection to controller
             if controllerSocket ~= nil then
                 cryptoNet.close(controllerSocket)
@@ -439,136 +328,85 @@ local function userMenu()
             sleep(5)
         end
     end
-    dumpDisk()
 end
 
---check if disk id is registered
-local function checkID()
+local function loginScreen()
+    monitor.setBackgroundColor(colors.blue)
+    monitor.clear()
+    monitor.setCursorPos(1, 1)
+    monitor.setBackgroundColor(colors.black)
+    monitor.clearLine()
+    centerText("Schindler Arcade:" .. settings.get("clientName"))
+    monitor.setCursorPos(1, 3)
+    monitor.setBackgroundColor(colors.blue)
+    centerText("Waiting for login")
+    monitor.setCursorPos(1, 5)
+    centerText("Please check your")
+    monitor.setCursorPos(1, 6)
+    centerText("pocket computer")
+
     local event
-    local isRegistered = false
-    local tab = {}
-    loadingScreen("Loading information from server...")
-    cryptoNet.send(bankServerSocket, { "checkID", settings.get("diskdrive") })
     repeat
-        event, isRegistered = os.pullEvent()
-    until event == "gotCheckID"
-
-    return isRegistered
-end
-
-local function diskChecker()
-    local id = diskdrive.getDiskID()
-    local isRegistered = checkID()
-
-    --Prevent malicious execution from diskdrive
-    if fs.exists(diskdrive.getMountPath() .. "/startup") then
-        fs.delete(diskdrive.getMountPath() .. "/startup")
-    end
-    if fs.exists(diskdrive.getMountPath() .. "/startup.lua") then
-        fs.delete(diskdrive.getMountPath() .. "/startup.lua")
-    end
-
-    if isRegistered then
-        loadingScreen("User Found, Loading credits...")
-        --get credits from server
-        credits = getCredits(id)
-        --diskdrive.setDiskLabel("ID: " .. tostring(id) .. " Credits: " .. tostring(credits))
-        userMenu()
-    else
-        error("Disk ID not registered!")
-        dumpDisk()
-        dumpHopper()
-        dumpDropper()
-    end
-end
-
-local function drawMonitorIntro()
-    if monitor ~= nil then
-        monitor.setTextScale(1)
-        monitor.setBackgroundColor(colors.blue)
-        monitor.clear()
-        monitor.setCursorPos(1, 1)
-        monitor.setBackgroundColor(colors.black)
-        monitor.clearLine()
-        centerTextMonitor(monitor, "Schindler Arcade:" .. settings.get("clientName"))
-        monitor.setCursorPos(1, 3)
-        monitor.setBackgroundColor(colors.blue)
-        centerTextMonitor(monitor, "Welcome to " .. settings.get("gameName") .. "!")
-        monitor.setCursorPos(1, 5)
-        centerTextMonitor(monitor, settings.get("description"))
-        if string.len(settings.get("author")) > 1 then
-            monitor.setCursorPos(1, 6)
-            centerTextMonitor(monitor, "by " .. settings.get("author"))
-            monitor.setCursorPos(1, 7)
-            centerTextMonitor(monitor, "Forked by Schindler")
-        end
-
-        monitor.setCursorPos(1, 9)
-        centerTextMonitor(monitor, "Please insert Floppy Disk")
-        monitor.setCursorPos(1, 10)
-        if settings.get("cost") <= 0 then
-            centerTextMonitor(monitor, "Free to play")
-        elseif settings.get("cost") == 1 then
-            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
-        else
-            centerTextMonitor(monitor, "\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
-        end
-
-        if settings.get("debug") then
-            monitor.setCursorPos(1, 12)
-            monitor.setTextColor(colors.red)
-            centerTextMonitor(monitor, "DEBUG MODE")
-            monitor.setTextColor(colors.white)
-        end
-    end
+        event = os.pullEvent()
+    until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin"
+    print("loginScreen exit reason: " .. tostring(event))
 end
 
 local function drawMainMenu()
-    --term.setTextScale(0.5)
-    --term.setCursorPos(1, 1)
-    monitor.setTextColor(colors.white)
-    --term.setTextColor(colors.white)
-
     while true do
-        --term.setTextColor(colors.white)
         monitor.setTextColor(colors.white)
-        drawMonitorIntro()
-        --Look for floppydisk
-        local diskSlot = 0
-        while diskSlot == 0 do
-            if hopper ~= nil then
-                local itemList = hopper.list()
-                if itemList ~= nil then
-                    for slot, item in pairs(itemList) do
-                        debugLog(item.name)
-                        if item.name == "computercraft:disk" then
-                            diskSlot = slot
-                        else
-                            dumpHopper()
-                        end
-                    end
-                else
-                    pcall(sleep, 1)
-                end
-            end
-        end
-        pullDisk(diskSlot)
-        loadingScreen("Reading Disk...")
-        if not diskdrive.hasData() then
-            monitor.setBackgroundColor(colors.red)
+        if monitor ~= nil then
+            code = math.random(1000, 9999)
+            monitor.setTextScale(1)
+            monitor.setBackgroundColor(colors.blue)
             monitor.clear()
-            monitor.setCursorPos(1, 2)
-            centerText("Error Reading Disk")
-            dumpDisk()
-            pcall(sleep, 5)
-        else
-            diskChecker()
+            monitor.setCursorPos(1, 1)
+            monitor.setBackgroundColor(colors.black)
+            monitor.clearLine()
+            centerText("Schindler Arcade:" .. settings.get("clientName"))
+            monitor.setCursorPos(1, 3)
+            monitor.setBackgroundColor(colors.blue)
+            centerText("Welcome to " .. settings.get("gameName") .. "!")
+            monitor.setCursorPos(1, 5)
+            centerText(settings.get("description"))
+            if string.len(settings.get("author")) > 1 then
+                monitor.setCursorPos(1, 6)
+                centerText("by " .. settings.get("author"))
+                monitor.setCursorPos(1, 7)
+                centerText("Forked by Schindler")
+            end
+
+            monitor.setCursorPos(1, 9)
+            centerText("Please enter code")
+            monitor.setCursorPos(1, 10)
+            if settings.get("cost") <= 0 then
+                centerText("Free to play")
+            elseif settings.get("cost") == 1 then
+                centerText("\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
+            else
+                centerText("\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
+            end
+
+            if settings.get("debug") then
+                monitor.setCursorPos(1, 11)
+                monitor.setTextColor(colors.red)
+                centerText("DEBUG MODE")
+                monitor.setTextColor(colors.white)
+            end
+            monitor.setCursorPos(1, 12)
+            centerText("Connect Code: " .. tostring(code))
+
+            codeServer()
+
+            --timeout for controller to connect
+            timeoutConnectController = os.startTimer(10)
+
+            loginScreen()
         end
-        --sleep(10)
     end
 end
 
-local function getCraftingServerCert()
+local function getServerCert()
     --Download the cert from the crafting server if it doesnt exist already
     local filePath = settings.get("BankServer") .. ".crt"
     if not fs.exists(filePath) then
@@ -597,86 +435,151 @@ local function onEvent(event)
         local socket = event[3]
         -- The logged-in username is also stored in the socket
         print(socket.username .. " just logged in.")
+    elseif event[1] == "hash_login" then
+        getServerCert()
+        userMenu()
     elseif event[1] == "encrypted_message" then
         local socket = event[3]
-        local message = event[2][1]
-        local data = event[2][2]
+
         if socket.username == nil then
             socket.username = "LAN Host"
         end
-        debugLog("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
-        if message == "keyPressed" then
-            if type(data[1]) == "number" then
-                if keys.getName(data[1]) ~= "nil" then
-                    debugLog("keyPressed key" .. keys.getName(data[1]) .. " is_held:" .. tostring(data[2]))
-                    os.queueEvent("key", data[1], data[2])
+        if socket.username ~= "LAN Host" then
+            local message = event[2][1]
+            local data = event[2][2]
+            debugLog("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
+            if message == "keyPressed" then
+                if type(data[1]) == "number" then
+                    if keys.getName(data[1]) ~= "nil" then
+                        debugLog("keyPressed key" .. keys.getName(data[1]) .. " is_held:" .. tostring(data[2]))
+                        os.queueEvent("key", data[1], data[2])
+                    end
+                else
+                    print("type(data[1]) ~= number")
                 end
-            else
-                print("type(data[1]) ~= number")
-            end
-        elseif message == "keyReleased" then
-            if type(data[1]) == "number" then
-                if keys.getName(data[1]) ~= "nil" then
-                    debugLog("keyReleased key" .. keys.getName(data[1]))
-                    os.queueEvent("key_up", data[1])
+            elseif message == "keyReleased" then
+                if type(data[1]) == "number" then
+                    if keys.getName(data[1]) ~= "nil" then
+                        debugLog("keyReleased key" .. keys.getName(data[1]))
+                        os.queueEvent("key_up", data[1])
+                    end
+                else
+                    print("type(data[1]) ~= number")
                 end
-            else
-                print("type(data[1]) ~= number")
+            elseif message == "charPressed" then
+                if type(data[1]) == "string" then
+                    debugLog("charPressed char" .. data[1])
+                    os.queueEvent("char", data[1])
+                end
+            elseif message == "controllerConnect" then
+                if controllerSocket == nil then
+                    controllerSocket = socket
+                    os.cancelTimer(timeoutConnectController)
+                    timeoutConnectController = nil
+                    print("Controller connected")
+                else
+                    print("Duplicate controller conection attempt!")
+                    log("Duplicate controller conection attempt!")
+                end
+            elseif message == "getControls" then
+                print("Controls requested")
+                local file = fs.open("controls.db", "r")
+                local contents = file.readAll()
+                file.close()
+
+                local decoded = textutils.unserialize(contents)
+                if type(decoded) == "table" and next(decoded) then
+                    print("Controls Found")
+                    cryptoNet.send(socket, { message, decoded })
+                else
+                    print("Controls Not Found")
+                    cryptoNet.send(socket, { {} })
+                end
+            elseif message == "checkPasswordHashed" then
+                os.queueEvent("gotCheckPasswordHashed", data, event[2][3])
+            elseif message == "getCertificate" then
+                os.queueEvent("gotCertificate", data)
+            elseif message == "newID" then
+                os.queueEvent("gotNewID")
+            elseif message == "checkID" then
+                os.queueEvent("gotCheckID", data)
+            elseif message == "getCredits" then
+                os.queueEvent("gotCredits", data)
+                if controllerSocket ~= nil then
+                    cryptoNet.send(controllerSocket, { message, data })
+                end
+            elseif message == "pay" then
+                os.queueEvent("gotPay", data)
+            elseif message == "getValue" then
+                os.queueEvent("gotValue", data)
+            elseif message == "depositItems" then
+                os.queueEvent("gotDepositItems")
+            elseif message == "transfer" then
+                os.queueEvent("gotTransfer", data)
             end
-        elseif message == "charPressed" then
-            if type(data[1]) == "string" then
-                debugLog("charPressed char" .. data[1])
-                os.queueEvent("char", data[1])
-            end
-        elseif message == "controllerConnect" then
-            if controllerSocket == nil then
+        else
+            --User is not logged in
+            local message = event[2][1]
+            local data = event[2][2]
+            debugLog("Client: " .. socket.target .. " request: " .. tostring(message))
+            if message == "controllerConnect" then
                 controllerSocket = socket
                 os.cancelTimer(timeoutConnectController)
                 timeoutConnectController = nil
                 print("Controller connected")
-            else
-                print("Duplicate controller conection attempt!")
-                log("Duplicate controller conection attempt!")
-            end
-        elseif message == "getControls" then
-            print("Controls requested")
-            local file = fs.open("controls.db", "r")
-            local contents = file.readAll()
-            file.close()
+            elseif message == "hashLogin" then
+                --Need to auth with server
+                --debugLog("hashLogin")
+                print("User login request for: " .. data.username)
+                log("User login request for: " .. data.username)
+                local tmp = {}
+                tmp.username = data.username
+                tmp.passwordHash = cryptoNet.hashPassword(data.username, data.password, settings.get("BankServer"))
+                tmp.servername = data.servername
+                data.password = nil
+                cryptoNet.send(bankServerSocket, { "checkPasswordHashed", tmp })
 
-            local decoded = textutils.unserialize(contents)
-            if type(decoded) == "table" and next(decoded) then
-                print("Controls Found")
-                cryptoNet.send(socket, { message, decoded })
-            else
-                print("Controls Not Found")
-                cryptoNet.send(socket, { {} })
+                local event2
+                local loginStatus = false
+                local permissionLevel = 0
+                repeat
+                    event2, loginStatus, permissionLevel = os.pullEvent("gotCheckPasswordHashed")
+                until event2 == "gotCheckPasswordHashed"
+                --debugLog("loginStatus:"..tostring(loginStatus))
+                if loginStatus == true then
+                    cryptoNet.send(socket, { "hashLogin", true, permissionLevel })
+                    socket.username = data.username
+                    socket.permissionLevel = permissionLevel
+
+                    --Update internal sockets
+                    for k, v in pairs(server.sockets) do
+                        if v.target == socket.target then
+                            server.sockets[k] = socket
+                            server.sockets[k].username = data.username
+                            break
+                        end
+                    end
+                    controllerSocket.username = data.username
+
+                    os.queueEvent("hash_login", socket.username, socket)
+                else
+                    print("User: " .. data.username .. " failed to login")
+                    log("User: " .. data.username .. " failed to login")
+                    os.queueEvent("cancelLogin")
+                    cryptoNet.send(socket, { "hashLogin", false })
+                end
+            elseif message == "cancelLogin" then
+                print("cancelLogin")
+                os.queueEvent("cancelLogin")
+                cryptoNet.close(controllerSocket)
+                controllerSocket = nil
             end
-        elseif message == "getCertificate" then
-            os.queueEvent("gotCertificate", data)
-        elseif message == "newID" then
-            os.queueEvent("gotNewID")
-        elseif message == "checkID" then
-            os.queueEvent("gotCheckID", data)
-        elseif message == "getCredits" then
-            os.queueEvent("gotCredits", data)
-        elseif message == "pay" then
-            os.queueEvent("gotPay", data)
-        elseif message == "getValue" then
-            os.queueEvent("gotValue", data)
-        elseif message == "depositItems" then
-            os.queueEvent("gotDepositItems")
-        elseif message == "transfer" then
-            os.queueEvent("gotTransfer", data)
         end
     elseif event[1] == "timer" then
         if event[2] == timeoutConnect then
             --Reboot after failing to connect
             loadingScreen("Failed to connect, rebooting...")
             cryptoNet.closeAll()
-            dumpDisk()
-            dumpHopper()
-            dumpDropper()
             os.reboot()
         elseif event[2] == timeoutConnectController then
             if controllerSocket ~= nil then
@@ -684,9 +587,6 @@ local function onEvent(event)
                 controllerSocket = nil
             end
             os.queueEvent("rednet_message", 0, "timeoutConnectController")
-            dumpDisk()
-            dumpHopper()
-            dumpDropper()
             debugLog("timeoutConnectController")
             os.queueEvent("timeoutConnectController")
         end
@@ -695,20 +595,13 @@ local function onEvent(event)
         --log(dump(event))
         loadingScreen("Connection lost, rebooting...")
         cryptoNet.closeAll()
-        dumpDisk()
-        dumpHopper()
-        dumpDropper()
         os.reboot()
     elseif event[1] == "quitGame" then
         print("quitGame")
         cryptoNet.closeAll()
         os.reboot()
     elseif event[1] == "requestCredits" then
-        if type(event[2]) == "number" then
-            getCredits(event[2])
-        else
-            getCredits(diskdrive.getDiskID())
-        end
+        getCredits()
     elseif event[1] == "requestPay" then
         if type(event[2]) == "number" then
             pay(event[2])
@@ -727,18 +620,13 @@ local function onStart()
     end
     --Close any old connections and servers
     cryptoNet.closeAll()
-    redstone.setOutput(redstoneSide, false)
 
     hopper = peripheral.wrap(settings.get("inputHopper"))
     dropper = peripheral.wrap(settings.get("outputDropper"))
-    diskdrive = peripheral.wrap(settings.get("diskdrive"))
+    --diskdrive = peripheral.wrap(settings.get("diskdrive"))
     width, height = monitor.getSize()
     --term.setTextScale(0.5)
     loadingScreen("Arcade is loading")
-
-    dumpDisk()
-    dumpHopper()
-    dumpDropper()
 
     centerText("Connecting to server...")
     log("Connecting to server: " .. settings.get("BankServer"))
@@ -751,7 +639,7 @@ local function onStart()
     print("Connected!")
     --timeout no longer needed
     timeoutConnect = nil
-    getCraftingServerCert()
+    --getServerCert()
     server = cryptoNet.host(settings.get("clientName"), true, false, wirelessModemSide)
     rednet.open(wirelessModemSide)
     drawMainMenu()
@@ -762,7 +650,7 @@ local function startupProgram()
 end
 
 loadingScreen("Arcade is loading")
-checkUpdates()
+--checkUpdates()
 
 print("Client is loading, please wait....")
 
@@ -779,6 +667,5 @@ end
 pcall(cryptoNet.startEventLoop, onStart, onEvent)
 
 cryptoNet.closeAll()
-dumpDisk()
-redstone.setOutput(redstoneSide, false)
+--dumpDisk()
 --os.reboot()
