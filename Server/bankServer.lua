@@ -311,7 +311,7 @@ local function onEvent(event)
         if socket.username == nil then
             socket.username = "LAN Host"
         end
-        print(("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message)))
+        print(("User: " .. socket.username .. " Client: " .. string.sub(tostring(socket.target), 1, 5) .. " request: " .. tostring(message)))
         log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
         debugLog("data:" .. textutils.serialise(data))
         --These can only be used by logged in users
@@ -334,7 +334,7 @@ local function onEvent(event)
                     writeDatabase()
                 else
                     print("Failed to create user")
-                    if not userExists then
+                    if userExists then
                         print("User already exists")
                         cryptoNet.send(socket, { message, false, "User already exists" })
                     elseif type(data.password) ~= "string" then
@@ -416,6 +416,7 @@ local function onEvent(event)
                             local credits = getCredits(username)
                             if credits - amount >= 0 then
                                 log("Credits change: user:" .. username .. " amount:" .. tostring(-1 * amount))
+                                print("Credits change: user:" .. username .. " amount:" .. tostring(-1 * amount))
                                 addCredits(username, (-1 * amount))
                                 cryptoNet.send(socket, { message, true })
                             else
@@ -559,9 +560,16 @@ local function onStart()
         print("Creating ATM user")
         cryptoNet.addUser("ATM", inputPass, 3, serverLAN)
     end
+    if cryptoNet.userExists("ARCADE", serverLAN) == false then
+        print("User ARCADE not found")
+        print("Enter new ARCADE User Password:")
+        local inputPass = read()
+        print("Creating ARCADE user")
+        cryptoNet.addUser("ARCADE", inputPass, 3, serverLAN)
+    end
 end
 
---checkUpdates()
+checkUpdates()
 print("Server is loading, please wait....")
 
 cryptoNet.setLoggingEnabled(true)

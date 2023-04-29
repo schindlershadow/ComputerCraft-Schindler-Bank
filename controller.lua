@@ -122,12 +122,23 @@ local function centerText(text)
     term.write(text)
 end
 
+local function drawTransition(color)
+    term.setBackgroundColor(color)
+    for i = 1, termY do
+        --paintutils.drawLine(1, i, termX, i, color)
+        term.setCursorPos(1,i)
+        term.clearLine()
+        sleep(0)
+    end
+end
+
 local function loadingScreen(text)
     if type(text) == nil then
         text = ""
     end
     term.setBackgroundColor(colors.red)
-    term.clear()
+    --term.clear()
+    drawTransition(colors.red)
     term.setCursorPos(1, 2)
     centerText(text)
     term.setCursorPos(1, 4)
@@ -199,7 +210,8 @@ end
 local function userAdd(user, pass, code)
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.white)
-    term.clear()
+    --term.clear()
+    drawTransition(colors.black)
     term.setCursorPos(1, 1)
     if string.len(pass) < 4 then
         print("Password too short!")
@@ -251,6 +263,7 @@ local function newUserMenu(serverName, code)
     local text = ""
     local selectedField = "user"
     local width, height = term.getSize()
+    drawTransition(colors.gray)
     while done == false do
         term.setBackgroundColor(colors.gray)
         term.clear()
@@ -375,7 +388,9 @@ local function newUserMenu(serverName, code)
                 if status == true then
                     done = true
                 else
+                    user = ""
                     pass = ""
+                    selectedField = "user"
                 end
             elseif key == keys.tab then
                 --toggle user/pass text entry
@@ -394,7 +409,9 @@ local function newUserMenu(serverName, code)
                     if status == true then
                         done = true
                     else
+                        user = ""
                         pass = ""
+                        selectedField = "user"
                     end
                 elseif (x > border + 1 and x < border + 1 + 7) then
                     --cancel
@@ -409,7 +426,7 @@ local function newUserMenu(serverName, code)
     --term.setCursorPos(1, 1)
 end
 
-local function loginMenu(serverName, code)
+local function loginMenu(serverName, code, serverType)
     if username ~= "" then
         login(serverSocket, username, password, code)
         return
@@ -420,6 +437,7 @@ local function loginMenu(serverName, code)
     local text = ""
     local selectedField = "user"
     local width, height = term.getSize()
+    drawTransition(colors.gray)
     while done == false do
         term.setBackgroundColor(colors.gray)
         term.clear()
@@ -506,7 +524,7 @@ local function loginMenu(serverName, code)
         term.setBackgroundColor(colors.red)
         term.write(" Cancel ")
         term.setCursorPos(9, forth + 10)
-        if serverName ~= "LocalHost" then
+        if serverName ~= "LocalHost" and serverType == "ATM" then
             term.setBackgroundColor(colors.blue)
             term.write(" New (F1)  ")
         end
@@ -569,8 +587,9 @@ local function loginMenu(serverName, code)
                     selectedField = "user"
                 end
             elseif key == keys.f1 then
-                if serverName ~= "LocalHost" then
+                if serverName ~= "LocalHost" and serverType == "ATM" then
                     newUserMenu(serverName, code)
+                    drawTransition(colors.gray)
                 end
             end
         elseif event == "mouse_click" then
@@ -587,8 +606,9 @@ local function loginMenu(serverName, code)
                     done = true
                 elseif (x > 10 and x < 9 + 7) then
                     --newuser
-                    if serverName ~= "LocalHost" then
+                    if serverName ~= "LocalHost" and serverType == "ATM" then
                         newUserMenu(serverName, code)
+                        drawTransition(colors.gray)
                     end
                 elseif (x > 1 and x < 7) then
                     --cancel
@@ -608,25 +628,34 @@ end
 
 local function connectToServer()
     term.setBackgroundColor(colors.gray)
-    term.clear()
+    --term.clear()
+    drawTransition(colors.gray)
     term.setCursorPos(1, 1)
     term.setBackgroundColor(colors.black)
     term.clearLine()
     centerText("Schindler Controller")
+    sleep(0)
     term.setBackgroundColor(colors.gray)
     term.setCursorPos(1, 6)
     term.write("Put this Pocket Computer")
+    sleep(0)
     term.setCursorPos(1, 7)
     term.write("in your offhand")
+    sleep(0)
     term.setCursorPos(1, 9)
     term.write("Enter the code displayed")
+    sleep(0)
     term.setCursorPos(1, 10)
     term.write("on the monitor")
+    sleep(0)
     term.setCursorPos(1, 12)
     term.write("Enter 0 to exit")
+    sleep(0)
     paintutils.drawFilledBox(1, termY, 6, termY, colors.darkGrey)
+    sleep(0)
     term.setCursorPos(1, termY)
     term.write("CODE: ")
+    sleep(0)
     paintutils.drawFilledBox(7, termY, termX, termY, colors.white)
     term.setCursorPos(8, termY)
     term.setTextColor(colors.black)
@@ -648,7 +677,7 @@ local function connectToServer()
         connectToServer()
         return
     else
-        term.clear()
+        --term.clear()
         loadingScreen("Connecting")
         timeoutConnect = os.startTimer(15)
         serverSocket = cryptoNet.connect(message, 30, 5)
@@ -656,8 +685,13 @@ local function connectToServer()
         os.cancelTimer(timeoutConnect)
         timeoutConnect = nil
         cryptoNet.send(serverSocket, { "controllerConnect" })
-
-        loginMenu(message, code)
+        cryptoNet.send(serverSocket, { "getServerType" })
+        local event, serverType
+        repeat
+            event, serverType = os.pullEventRaw()
+        until event == "gotServerType"
+        debugLog("serverType: " .. tostring(serverType))
+        loginMenu(message, code, serverType)
     end
 end
 
@@ -673,21 +707,25 @@ local function onEvent(event)
 
         term.setBackgroundColor(colors.black)
         term.setTextColor(colors.white)
-        term.clear()
+        --term.clear()
+        drawTransition(colors.black)
         term.setCursorPos(1, 1)
         term.setBackgroundColor(colors.blue)
         term.clearLine()
         centerText("Schindler Controller")
+        sleep(0)
         term.setCursorPos(1, 2)
         term.setBackgroundColor(colors.gray)
         term.clearLine()
         centerText("Controls")
+        sleep(0)
         term.setBackgroundColor(colors.black)
         term.setCursorPos(1, 3)
         --debugLog("controls:" .. textutils.serialise(controls))
         for k, v in pairs(controls) do
             if v ~= nil and v.key ~= nil and v.discription ~= nil then
                 print(tostring(v.discription) .. ": " .. tostring(v.key))
+                sleep(0)
             end
         end
         while true do
@@ -695,8 +733,11 @@ local function onEvent(event)
                 local event3, key, is_held
                 repeat
                     event3, key, is_held = os.pullEventRaw()
-                until event3 == "key" or event3 == "key_up" or event3 == "char"
-                if type(key) == "number" and keys.getName(key) ~= "nil" or event3 == "char" then
+                until event3 == "key" or event3 == "key_up" or event3 == "char" or event3 == "exit"
+
+                if event3 == "exit" then
+                    return
+                elseif type(key) == "number" and keys.getName(key) ~= "nil" or event3 == "char" then
                     if event3 == "key" then
                         debugLog(("%s held=%s"):format(keys.getName(key), is_held))
                         cryptoNet.send(serverSocket, { "keyPressed", { key, is_held } })
@@ -746,6 +787,8 @@ local function onEvent(event)
             os.queueEvent("hashLogin", event[2][2], event[2][3])
         elseif message == "addUser" then
             os.queueEvent("gotAddUser", event[2][2], event[2][3])
+        elseif message == "getServerType" then
+            os.queueEvent("gotServerType", data)
         end
     elseif event[1] == "timer" then
         if event[2] == timeoutConnect then
@@ -757,15 +800,18 @@ end
 
 local function drawHelp()
     term.setBackgroundColor(colors.gray)
-    term.clear()
+    --term.clear()
+    drawTransition(colors.gray)
     term.setCursorPos(1, 1)
     term.setBackgroundColor(colors.black)
     term.clearLine()
     centerText("Schindler Controller")
+    sleep(0)
     term.setBackgroundColor(colors.gray)
     term.setCursorPos(1, 3)
-    print(
-        "Schindler controller is your interface to Schindler Bank, Schindler Arcade and Schindler casino. Throwing a Wireless Pocket computer into a Schindler Bank ATM will create this controller software.")
+    textutils.slowPrint(
+        "Schindler controller is your interface to Schindler Bank, Schindler Arcade and Schindler casino. Throwing a Wireless Pocket computer into a Schindler Bank ATM will create this controller software.",40)
+    sleep(0)
     term.setCursorPos(1, 20)
     centerText("Press any key to continue...")
     local event, key
@@ -776,6 +822,7 @@ end
 
 local function onStart()
     rednet.open(modemSide)
+    drawTransition(colors.gray)
     while true do
         term.setBackgroundColor(colors.gray)
         term.clear()
@@ -783,32 +830,43 @@ local function onStart()
         term.setBackgroundColor(colors.black)
         term.clearLine()
         centerText("Schindler Controller")
+        sleep(0)
         term.setBackgroundColor(colors.gray)
         term.setCursorPos(1, 3)
         centerText("Welcome to Schindler")
+        sleep(0)
         term.setCursorPos(1, 4)
         centerText("Controller!")
+        sleep(0)
         term.setCursorPos(1, 6)
         if username == "" then
             centerText("Not logged in!")
+            sleep(0)
         else
             centerText("Hello " .. username)
+            sleep(0)
             term.setCursorPos(1, 7)
             centerText("Your login is cached")
+            sleep(0)
             if credits ~= -1 then
                 term.setCursorPos(1, 8)
                 centerText("Credits: \167" .. tostring(credits))
+                sleep(0)
             end
         end
         term.setCursorPos(1, 10)
         centerText("Please enter an option:")
+        sleep(0)
         term.setCursorPos(2, 11)
         term.write("1) Code Connect")
+        sleep(0)
         term.setCursorPos(2, 12)
         term.write("2) Help")
+        sleep(0)
         term.setCursorPos(2, 13)
         if username ~= "" then
             term.write("3) Logout")
+            
         else
             term.write("3) Cache login")
         end
@@ -824,8 +882,10 @@ local function onStart()
         if (key == keys.one or key == keys.numPad1 or key == keys.enter or key == keys.numPadEnter) then
             sleep(0.2)
             connectToServer()
+            drawTransition(colors.gray)
         elseif key == keys.two or key == keys.numPad2 then
             drawHelp()
+            drawTransition(colors.gray)
         elseif key == keys.three or key == keys.numPad3 then
             if username ~= "" then
                 username = ""
@@ -833,13 +893,14 @@ local function onStart()
             else
                 sleep(0.2)
                 --Cache login
-                loginMenu("LocalHost", 0)
+                loginMenu("LocalHost", 0, "LocalHost")
+                drawTransition(colors.gray)
             end
         end
     end
 end
 
---checkUpdates()
+checkUpdates()
 cryptoNet.setLoggingEnabled(false)
 pcall(cryptoNet.startEventLoop, onStart, onEvent)
 cryptoNet.closeAll()

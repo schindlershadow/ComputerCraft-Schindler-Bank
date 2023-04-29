@@ -3,6 +3,7 @@ local githubFolder = "arcade"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
 local timeoutConnect = nil
 local timeoutConnectController = nil
+local controllerTimer = nil
 local bankServerSocket = nil
 local credits = 0
 local code = 0
@@ -12,6 +13,8 @@ local monitorSide = "back"
 local controllerSocket
 local monitor = peripheral.wrap(monitorSide)
 local modem = peripheral.wrap(wirelessModemSide)
+
+monitor.setTextScale(1)
 
 settings.define("clientName",
     { description = "The hostname of this client", "client" .. tostring(os.getComputerID()), type = "string" })
@@ -181,10 +184,22 @@ local function centerText(text)
     end
 end
 
+local function drawTransition(color)
+    local x,y = monitor.getSize()
+    monitor.setBackgroundColor(color)
+    for i = 1, y do
+        --paintutils.drawLine(1, i, termX, i, color)
+        monitor.setCursorPos(1,i)
+        monitor.clearLine()
+        sleep(0)
+    end
+end
+
 local function drawExit()
     monitor.setTextScale(1)
-    monitor.setBackgroundColor(colors.blue)
-    monitor.clear()
+    --monitor.setBackgroundColor(colors.blue)
+    --monitor.clear()
+    drawTransition(colors.blue)
     monitor.setCursorPos(1, 1)
     monitor.setBackgroundColor(colors.black)
     monitor.clearLine()
@@ -198,13 +213,28 @@ local function loadingScreen(text)
     if type(text) == nil then
         text = ""
     end
-    monitor.setBackgroundColor(colors.red)
-    monitor.clear()
+    --monitor.setBackgroundColor(colors.red)
+    --monitor.clear()
+    drawTransition(colors.red)
     monitor.setCursorPos(1, 2)
     centerText(text)
     monitor.setCursorPos(1, 4)
     centerText("Loading...")
     monitor.setCursorPos(1, 6)
+end
+
+local function resetControllerTimer()
+    if controllerTimer == nil then
+        controllerTimer = os.startTimer(300)
+    else
+        os.cancelTimer(controllerTimer)
+        controllerTimer = os.startTimer(300)
+    end
+end
+
+local function stopControllerTimer()
+    os.cancelTimer(controllerTimer)
+    controllerTimer = nil
 end
 
 local function getCredits()
@@ -270,8 +300,9 @@ local function userMenu()
     local done = false
     while done == false do
         getCredits()
-        monitor.setBackgroundColor(colors.blue)
-        monitor.clear()
+        --monitor.setBackgroundColor(colors.blue)
+        --monitor.clear()
+        drawTransition(colors.blue)
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
@@ -328,11 +359,14 @@ local function userMenu()
             sleep(5)
         end
     end
+    stopControllerTimer()
+    os.queueEvent("exit")
 end
 
 local function loginScreen()
-    monitor.setBackgroundColor(colors.blue)
-    monitor.clear()
+    --monitor.setBackgroundColor(colors.blue)
+    --monitor.clear()
+    drawTransition(colors.blue)
     monitor.setCursorPos(1, 1)
     monitor.setBackgroundColor(colors.black)
     monitor.clearLine()
@@ -358,8 +392,9 @@ local function drawMainMenu()
         if monitor ~= nil then
             code = math.random(1000, 9999)
             monitor.setTextScale(1)
-            monitor.setBackgroundColor(colors.blue)
-            monitor.clear()
+            --monitor.setBackgroundColor(colors.blue)
+            --monitor.clear()
+            drawTransition(colors.blue)
             monitor.setCursorPos(1, 1)
             monitor.setBackgroundColor(colors.black)
             monitor.clearLine()
@@ -372,8 +407,10 @@ local function drawMainMenu()
             if string.len(settings.get("author")) > 1 then
                 monitor.setCursorPos(1, 6)
                 centerText("by " .. settings.get("author"))
-                monitor.setCursorPos(1, 7)
-                centerText("Forked by Schindler")
+                if settings.get("author") ~= "Schindler" then
+                    monitor.setCursorPos(1, 7)
+                    centerText("Forked by Schindler")
+                end
             end
 
             monitor.setCursorPos(1, 9)
@@ -476,6 +513,7 @@ local function onEvent(event)
                     controllerSocket = socket
                     os.cancelTimer(timeoutConnectController)
                     timeoutConnectController = nil
+                    resetControllerTimer()
                     print("Controller connected")
                 else
                     print("Duplicate controller conection attempt!")
@@ -517,6 +555,12 @@ local function onEvent(event)
             elseif message == "transfer" then
                 os.queueEvent("gotTransfer", data)
             end
+
+            if controllerSocket ~= nil then
+                if socket.username == controllerSocket.username then
+                    resetControllerTimer()
+                end
+            end
         else
             --User is not logged in
             local message = event[2][1]
@@ -526,6 +570,7 @@ local function onEvent(event)
                 controllerSocket = socket
                 os.cancelTimer(timeoutConnectController)
                 timeoutConnectController = nil
+                resetControllerTimer()
                 print("Controller connected")
             elseif message == "hashLogin" then
                 --Need to auth with server
@@ -573,6 +618,8 @@ local function onEvent(event)
                 os.queueEvent("cancelLogin")
                 cryptoNet.close(controllerSocket)
                 controllerSocket = nil
+            elseif message == "getServerType" then
+                cryptoNet.send(controllerSocket, { message, "ARCADE" })
             end
         end
     elseif event[1] == "timer" then
@@ -589,6 +636,10 @@ local function onEvent(event)
             os.queueEvent("rednet_message", 0, "timeoutConnectController")
             debugLog("timeoutConnectController")
             os.queueEvent("timeoutConnectController")
+        elseif event[2] == controllerTimer then
+            debugLog("controllerTimer")
+            cryptoNet.closeAll()
+            os.reboot()
         end
     elseif event[1] == "connection_closed" then
         --print(dump(event))
@@ -621,8 +672,8 @@ local function onStart()
     --Close any old connections and servers
     cryptoNet.closeAll()
 
-    hopper = peripheral.wrap(settings.get("inputHopper"))
-    dropper = peripheral.wrap(settings.get("outputDropper"))
+    --hopper = peripheral.wrap(settings.get("inputHopper"))
+    --dropper = peripheral.wrap(settings.get("outputDropper"))
     --diskdrive = peripheral.wrap(settings.get("diskdrive"))
     width, height = monitor.getSize()
     --term.setTextScale(0.5)
@@ -636,6 +687,7 @@ local function onStart()
     timeoutConnect = os.startTimer(35)
     bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 30, 5, settings.get("BankServer") .. ".crt",
         modemSide)
+    cryptoNet.login(bankServerSocket, "ARCADE", settings.get("password"))
     print("Connected!")
     --timeout no longer needed
     timeoutConnect = nil
@@ -650,7 +702,7 @@ local function startupProgram()
 end
 
 loadingScreen("Arcade is loading")
---checkUpdates()
+checkUpdates()
 
 print("Client is loading, please wait....")
 

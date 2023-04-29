@@ -8,6 +8,7 @@ local doorRedstoneSide = "left"
 local speaker = peripheral.wrap("top")
 local timeoutConnect = nil
 local timeoutConnectController = nil
+local controllerTimer = nil
 local bankServerSocket = nil
 local controllerSocket = nil
 local hopper, dropper, monitor, diskdrive, wiredModem, wirelessModem
@@ -176,6 +177,20 @@ local function debugLog(text)
     end
 end
 
+local function resetControllerTimer()
+    if controllerTimer == nil then
+        controllerTimer = os.startTimer(300)
+    else
+        os.cancelTimer(controllerTimer)
+        controllerTimer = os.startTimer(300)
+    end
+end
+
+local function stopControllerTimer()
+    os.cancelTimer(controllerTimer)
+    controllerTimer = nil
+end
+
 local function pullDisk(slot)
     if hopper ~= nil and diskdrive ~= nil then
         if hopper.getItemDetail(slot).name == "computercraft:disk" or hopper.getItemDetail(slot).name == "computercraft:pocket_computer_advanced" then
@@ -255,17 +270,41 @@ local function centerText(text)
     monitor.write(text)
 end
 
+local function drawTransition(color)
+    local x,y = monitor.getSize()
+    monitor.setBackgroundColor(color)
+    for i = 1, y do
+        --paintutils.drawLine(1, i, termX, i, color)
+        monitor.setCursorPos(1,i)
+        monitor.clearLine()
+        sleep(0)
+    end
+end
+
 local function loadingScreen(text)
     if type(text) == nil then
         text = ""
     end
-    monitor.setBackgroundColor(colors.red)
-    monitor.clear()
+    --monitor.setBackgroundColor(colors.red)
+    --monitor.clear()
+    drawTransition(colors.red)
     monitor.setCursorPos(1, 2)
     centerText(text)
     monitor.setCursorPos(1, 4)
     centerText("Loading...")
     monitor.setCursorPos(1, 6)
+end
+
+local function drawScreen(text)
+    if type(text) == nil then
+        text = ""
+    end
+    --monitor.setBackgroundColor(colors.red)
+    --monitor.clear()
+    drawTransition(colors.gray)
+    monitor.setCursorPos(1, 2)
+    centerText(text)
+    monitor.setCursorPos(1, 4)
 end
 
 local function getCredits(user)
@@ -365,8 +404,9 @@ local function valueMenu()
         done = true
     end
     while done == false do
-        monitor.setBackgroundColor(colors.blue)
-        monitor.clear()
+        --monitor.setBackgroundColor(colors.blue)
+        --monitor.clear()
+        drawTransition(colors.blue)
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
@@ -412,8 +452,9 @@ local function depositMenu(username)
     local done = false
     allowHopper = true
     while done == false do
-        monitor.setBackgroundColor(colors.blue)
-        monitor.clear()
+        --monitor.setBackgroundColor(colors.blue)
+        --monitor.clear()
+        drawTransition(colors.blue)
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
@@ -451,6 +492,7 @@ end
 local function amountMenu(user)
     local done = false
     local amount = "0"
+    drawTransition(colors.blue)
     while done == false do
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
@@ -507,7 +549,8 @@ local function transferMenu()
     local done = false
     local user = ""
     --sleep to prevent double input
-    sleep(0.2)
+    --sleep(0.2)
+    drawTransition(colors.blue)
     while done == false do
         monitor.setBackgroundColor(colors.blue)
         monitor.clear()
@@ -581,27 +624,6 @@ local function transferMenu()
     end
 end
 
-local function drawDiskReminder()
-    --monitor.setTextScale(1)
-    monitor.setBackgroundColor(colors.blue)
-    monitor.clear()
-    monitor.setCursorPos(1, 1)
-    monitor.setBackgroundColor(colors.black)
-    monitor.clearLine()
-    centerText("Schindler ATM")
-    monitor.setCursorPos(1, 3)
-    monitor.setBackgroundColor(colors.blue)
-    centerText("Thank you for using")
-    monitor.setCursorPos(1, 4)
-    centerText("Schindler Bank")
-    monitor.setCursorPos(1, 19)
-    centerText("Dont forget your Disk!")
-    monitor.setCursorPos(1, 20)
-    centerText("\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27")
-    monitor.setCursorPos(1, 21)
-    centerText("\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27\27")
-end
-
 local function codeServer()
     while true do
         local id, message = rednet.receive()
@@ -618,8 +640,9 @@ local function userMenu()
     local done = false
     while done == false do
         getCredits(controllerSocket.username)
-        monitor.setBackgroundColor(colors.blue)
-        monitor.clear()
+        --monitor.setBackgroundColor(colors.blue)
+        --monitor.clear()
+        drawTransition(colors.blue)
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
@@ -672,6 +695,7 @@ local function userMenu()
     --monitor.setCursorPos(1,1)
     --sleep(1)
     os.queueEvent("exit")
+    stopControllerTimer()
     --dumpDisk()
 end
 
@@ -773,8 +797,9 @@ local function controllerWriteHandler()
 end
 
 local function loginScreen()
-    monitor.setBackgroundColor(colors.blue)
-    monitor.clear()
+    --monitor.setBackgroundColor(colors.blue)
+    --monitor.clear()
+    drawTransition(colors.blue)
     monitor.setCursorPos(1, 1)
     monitor.setBackgroundColor(colors.black)
     monitor.clearLine()
@@ -801,8 +826,9 @@ local function drawMonitor()
     while true do
         code = math.random(1000, 9999)
         print("code: " .. tostring(code))
-        monitor.setBackgroundColor(colors.blue)
-        monitor.clear()
+        --monitor.setBackgroundColor(colors.blue)
+        --monitor.clear()
+        drawTransition(colors.blue)
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
         monitor.clearLine()
@@ -951,6 +977,12 @@ local function onEvent(event)
             elseif message == "addUser" then
                 os.queueEvent("gotAddUser", event[2][2], event[2][3])
             end
+
+            if controllerSocket ~= nil then
+                if socket.username == controllerSocket.username then
+                    resetControllerTimer()
+                end
+            end
         else
             --User is not logged in
             local message = event[2][1]
@@ -959,6 +991,7 @@ local function onEvent(event)
                 controllerSocket = socket
                 os.cancelTimer(timeoutConnectController)
                 timeoutConnectController = nil
+                resetControllerTimer()
                 print("Controller connected")
             elseif message == "hashLogin" then
                 --Need to auth with server
@@ -1011,10 +1044,10 @@ local function onEvent(event)
                 until event2 == "gotAddUser"
                 cryptoNet.send(controllerSocket, { "addUser", status, reason })
                 if status == true then
-                    loadingScreen("New User Created!")
+                    drawScreen("New User Created!")
                     playAudioNewCustomer()
                 else
-                    loadingScreen("Failed to create user")
+                    drawScreen("Failed to create user")
                     monitor.write(reason)
                 end
             elseif message == "cancelLogin" then
@@ -1022,13 +1055,15 @@ local function onEvent(event)
                 os.queueEvent("cancelLogin")
                 cryptoNet.close(controllerSocket)
                 controllerSocket = nil
+            elseif message == "getServerType" then
+                cryptoNet.send(controllerSocket, { message, "ATM" })
             end
         end
     elseif event[1] == "timer" then
-        if event[2] == timeoutConnect or event[2] == timeoutConnectController then
+        if event[2] == timeoutConnect or event[2] == timeoutConnectController or event[2] == controllerTimer then
             --Reboot after failing to connect
-            loadingScreen("Failed to connect, rebooting...")
-            print("Failed to connect, rebooting...")
+            loadingScreen("Timeout, Rebooting")
+            print("Timeout, Rebooting")
             cryptoNet.closeAll()
             dumpDisk()
             dumpHopper()
@@ -1110,7 +1145,7 @@ local function onStart()
     drawMonitor()
 end
 
---checkUpdates()
+checkUpdates()
 
 print("Client is loading, please wait....")
 
