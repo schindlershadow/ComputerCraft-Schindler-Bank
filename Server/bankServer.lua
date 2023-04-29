@@ -3,7 +3,7 @@ local githubFolder = "Server"
 local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/master/cryptoNet.lua"
 local serverLAN, storageChest
 local monitors = {}
-local users = {}
+local creditsDB = {}
 local valueList = {}
 
 settings.define("serverName",
@@ -57,7 +57,7 @@ function checkUpdates()
     local filepath = "startup.lua"
     -- Get the latest commit hash from the repository
     local commiturl = "https://api.github.com/repos/" ..
-    owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
+        owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename
     local commitresponse = http.get(commiturl)
     if type(commitresponse) == "nil" then
         print("Failed to check for update")
@@ -89,7 +89,8 @@ function checkUpdates()
     if currentCommit ~= latestCommit then
         print("Update found with SHA256: " .. tostring(latestCommit))
         -- Download the latest script file
-        local startupURL = "https://raw.githubusercontent.com/" .. owner .. "/" .. repo .. "/main/".. githubFolder .. "/" .. githubFilename
+        local startupURL = "https://raw.githubusercontent.com/" ..
+            owner .. "/" .. repo .. "/main/" .. githubFolder .. "/" .. githubFilename
         local response = http.get(startupURL)
         local data = response.readAll()
         response.close()
@@ -156,54 +157,24 @@ local function debugLog(text)
     end
 end
 
-local function checkIDExists(id)
-    if type(id) ~= "number" then
-        id = tonumber(id)
-    end
-    for k, v in pairs(users) do
-        if v.id == id then
-            return true
-        end
-    end
-    return false
-end
-
 --write database file
 local function writeDatabase()
     if fs.exists("database.db") then
         fs.delete("database.db")
     end
     local storageFile = fs.open("database.db", "w")
-    storageFile.write(textutils.serialise(users))
+    storageFile.write(textutils.serialise(creditsDB))
     storageFile.close()
 end
 
---adds new id to database
-local function newID(id)
-    if type(id) ~= "number" then
-        id = tonumber(id)
+--returns number of credits user holds
+local function getCredits(username)
+    if type(username) ~= "string" then
+        return 0
     end
-    if not checkIDExists(id) then
-        local new = {}
-        new.id = id
-        new.credits = 0
-        table.insert(users, new)
-        writeDatabase()
-        return true
-    else
-        error("Tried to add existing id as new")
-        return false
-    end
-end
-
---returns number of credits id holds
-local function getCredits(id)
-    if type(id) ~= "number" then
-        id = tonumber(id)
-    end
-    for k, v in pairs(users) do
-        if v.id == id then
-            return v.credits
+    if creditsDB[username] ~= nil then
+        if creditsDB[username].username == username then
+            return creditsDB[username].credits
         end
     end
     return 0
@@ -276,45 +247,45 @@ local function depositItems(chestName)
     end
 end
 
-local function addCredits(id, value)
-    if type(id) ~= "number" then
-        id = tonumber(id)
-    end
-    if type(value) ~= "number" then
-        value = tonumber(value)
-    end
-    if id == nil or value == nil then
+local function addCredits(username, value)
+    if type(username) ~= "string" then
         return false
     end
-    for k, v in pairs(users) do
-        if v.id == id then
-            users[k].credits = users[k].credits + value
+    if type(value) ~= "number" then
+        return false
+    end
+    if creditsDB[username] ~= nil then
+        if creditsDB[username].username == username then
+            creditsDB[username].credits = creditsDB[username].credits + value
             writeDatabase()
             return true
         end
+    else
+        print("user: " .. username .. " not found in database" )
     end
-    writeDatabase()
+    --writeDatabase()
     return false
 end
 
-local function transferCredits(fromID, toID, credits)
-    if type(fromID) ~= "number" then
-        fromID = tonumber(fromID)
-    end
-    if type(toID) ~= "number" then
-        toID = tonumber(toID)
-    end
-    if type(credits) ~= "number" then
-        credits = tonumber(credits)
-    end
-    if fromID == nil or toID == nil or credits == nil or credits < 1 then
+local function transferCredits(fromUser, toUser, credits)
+    if type(fromUser) ~= "string" then
         return false
     end
-    if checkIDExists(fromID) and checkIDExists(toID) then
-        local currentCredits = getCredits(fromID)
+    if type(toUser) ~= "string" then
+        return false
+    end
+    if type(credits) ~= "number" then
+        return false
+    end
+    if credits < 1 then
+        return false
+    end
+    if creditsDB[fromUser] ~= nil and creditsDB[toUser] ~= nil then
+        local currentCredits = getCredits(fromUser)
         if currentCredits - credits >= 0 then
-            addCredits(fromID, (-1 * credits))
-            addCredits(toID, credits)
+            print("Credit trasfer from " .. fromUser .." to " .. toUser .. " amount:" .. tostring(credits))
+            addCredits(fromUser, (-1 * credits))
+            addCredits(toUser, credits)
             writeDatabase()
             return true
         else
@@ -327,7 +298,7 @@ end
 
 --Cryptonet event handler
 local function onEvent(event)
-    if event[1] == "login" then
+    if event[1] == "login" or event[1] == "hash_login" then
         local username = event[2]
         -- The socket of the client that just logged in
         local socket = event[3]
@@ -340,53 +311,135 @@ local function onEvent(event)
         if socket.username == nil then
             socket.username = "LAN Host"
         end
-        print(("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message)))
+        print(("User: " .. socket.username .. " Client: " .. string.sub(tostring(socket.target), 1, 5) .. " request: " .. tostring(message)))
         log("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
         debugLog("data:" .. textutils.serialise(data))
         --These can only be used by logged in users
         if socket.username ~= "LAN Host" then
             if message == "getServerType" then
                 cryptoNet.send(socket, { message, "BankServer" })
-            elseif message == "newID" then
-                local status = newID(data)
-                cryptoNet.send(socket, { message, status })
-            elseif message == "checkID" then
-                cryptoNet.send(socket, { message, checkIDExists(data) })
-            elseif message == "getCredits" then
-                cryptoNet.send(socket, { message, getCredits(data) })
-            elseif message == "getValue" then
-                cryptoNet.send(socket, { message, getValue(data) })
-            elseif message == "transfer" then
-                local fromID = data.fromID
-                local toID = data.toID
-                local credits = data.credits
-                local status = transferCredits(fromID, toID, credits)
-                cryptoNet.send(socket, { message, status })
-            elseif message == "pay" then
-                if type(data) == "table" then
-                    local id = data.id
-                    local amount = data.amount
-                    if type(id) == "number" and type(data.amount) == "number" and checkIDExists(id) then
-                        local credits = getCredits(id)
-                        if credits - amount >= 0 then
-                            log("Credits change: ID:" .. tostring(id) .. " amount:" .. tostring(-1 * amount))
-                            addCredits(id, (-1 * amount))
-                            cryptoNet.send(socket, { message, true })
-                        else
-                            cryptoNet.send(socket, { message, false })
-                        end
+            elseif message == "addUser" then
+                print(socket.username .. " requested: " .. tostring(message))
+                print("Request to add user: " .. data.username)
+                log("Request to add user: " .. data.username)
+                local permissionLevel = cryptoNet.getPermissionLevel(socket.username, serverLAN)
+                print("Permission Level:" .. tostring(permissionLevel))
+                local userExists = cryptoNet.userExists(data.username, serverLAN)
+                if permissionLevel >= 2 and not userExists and type(data.password) == "string" then
+                    cryptoNet.addUser(data.username, data.password, 1, serverLAN)
+                    creditsDB[data.username] = {}
+                    creditsDB[data.username].username = data.username
+                    creditsDB[data.username].credits = 0
+                    cryptoNet.send(socket, { message, true, "Success" })
+                    writeDatabase()
+                else
+                    print("Failed to create user")
+                    if userExists then
+                        print("User already exists")
+                        cryptoNet.send(socket, { message, false, "User already exists" })
+                    elseif type(data.password) ~= "string" then
+                        print("Password has invalid characters")
+                        cryptoNet.send(socket, { message, false, "Password has invalid characters" })
+                    elseif not (permissionLevel >= 2) then
+                        print("Permission issues")
+                        cryptoNet.send(socket, { message, false, "Permission issues" })
                     else
+                        print("Unknown error")
+                        cryptoNet.send(socket, { message, false, "Unknown error" })
+                    end
+                end
+            elseif message == "setPassword" then
+                print(socket.username .. " requested: " .. tostring(message))
+                local permissionLevel = cryptoNet.getPermissionLevel(socket.username, serverLAN)
+                local userExists = cryptoNet.userExists(data.username, serverLAN)
+                debugLog("setPassword:" ..
+                    socket.username ..
+                    ":" .. data.username .. ":" .. tostring(permissionLevel) .. ":" .. tostring(userExists))
+                if tonumber(permissionLevel) >= 2 and userExists and type(data.password) == "string" then
+                    cryptoNet.setPassword(data.username, data.password, serverLAN)
+                    cryptoNet.send(socket, { message, true })
+                elseif userExists and data.username == socket.username then
+                    cryptoNet.setPassword(data.username, data.password, serverLAN)
+                    cryptoNet.send(socket, { message, true })
+                else
+                    cryptoNet.send(socket, { message, false })
+                end
+            elseif message == "deleteUser" then
+                print(socket.username .. " requested: " .. tostring(message))
+                print("Request to delete user: " .. data.username)
+                log("Request to delete user: " .. data.username)
+                local permissionLevel = cryptoNet.getPermissionLevel(socket.username, serverLAN)
+                local userExists = cryptoNet.userExists(data.username, serverLAN)
+                if permissionLevel >= 2 and userExists then
+                    local userPermissionLevel = cryptoNet.getPermissionLevel(data.username, serverLAN)
+                    if userPermissionLevel < 3 then
+                        cryptoNet.deleteUser(data.username, serverLAN)
+                        cryptoNet.send(socket, { message, true })
+                        creditsDB[username] = nil
+                        writeDatabase()
+                    else
+                        --super admins cannot be deleted
                         cryptoNet.send(socket, { message, false })
                     end
                 else
                     cryptoNet.send(socket, { message, false })
                 end
+            elseif message == "checkPasswordHashed" then
+                local permissionLevel = cryptoNet.getPermissionLevel(socket.username, serverLAN)
+                -- check if user has perms or if on lan when logins are not required
+                if tonumber(permissionLevel) >= 2 then
+                    local check = cryptoNet.checkPasswordHashed(data.username, data.passwordHash, serverLAN)
+                    if check then
+                        permissionLevel = cryptoNet.getPermissionLevel(data.username, serverLAN)
+                        cryptoNet.send(socket, { message, true, permissionLevel })
+                    else
+                        cryptoNet.send(socket, { message, false, 0 })
+                    end
+                end
+            elseif message == "getCredits" then
+                cryptoNet.send(socket, { message, getCredits(data) })
+            elseif message == "getValue" then
+                cryptoNet.send(socket, { message, getValue(data) })
+            elseif message == "transfer" then
+                local fromUser = data.fromUser
+                local toUser = data.toUser
+                local credits = data.credits
+                
+                local status = transferCredits(fromUser, toUser, credits)
+                cryptoNet.send(socket, { message, status })
+            elseif message == "pay" then
+                if type(data) == "table" then
+                    local username = data.username
+                    local amount = data.amount
+                    if type(username) == "string" and type(amount) == "number" then
+                        if creditsDB[username] ~= nil then
+                            local credits = getCredits(username)
+                            if credits - amount >= 0 then
+                                log("Credits change: user:" .. username .. " amount:" .. tostring(-1 * amount))
+                                print("Credits change: user:" .. username .. " amount:" .. tostring(-1 * amount))
+                                addCredits(username, (-1 * amount))
+                                cryptoNet.send(socket, { message, true })
+                            else
+                                debugLog("Failed: credits + amount > 0")
+                                cryptoNet.send(socket, { message, false })
+                            end
+                        else
+                            debugLog("Failed creditsDB[username] ~= nil")
+                            cryptoNet.send(socket, { message, false })
+                        end
+                    end
+                else
+                    cryptoNet.send(socket, { message, false })
+                end
             elseif message == "depositItems" then
-                local chestName = data.chestName
-                local id = data.id
+                local chestName = data.chestname
+                local username = data.username
+                print("depositItems user:" .. username .." chestname:" .. chestName)
+                --local id = data.id
                 local value = getValue(chestName)
+                print("adding " .. tostring(value) .. " credits")
                 depositItems(chestName)
-                addCredits(id, value)
+                addCredits(username, value)
                 cryptoNet.send(socket, { message })
             elseif message == "getCertificate" then
                 local fileContents = nil
@@ -399,58 +452,38 @@ local function onEvent(event)
                 end
                 cryptoNet.send(socket, { message, fileContents })
             end
-        else
-            --These can be used by users not logged in
-            if message == "getServerType" then
-                cryptoNet.send(socket, { message, "BankServer" })
-            elseif message == "pay" then
-                if type(data) == "table" then
-                    local diskdriveName = data.diskdrive
-                    local amount = data.amount
-                    if type(diskdriveName) == "string" and type(amount) == "number" then
-                        local diskdrive = peripheral.wrap(diskdriveName)
-                        if diskdrive ~= nil then
-                            local id = diskdrive.getDiskID()
-                            if type(id) == "number" and type(data.amount) == "number" and checkIDExists(id) then
-                                local credits = getCredits(id)
-                                if credits - amount >= 0 then
-                                    log("Credits change: ID:" .. tostring(id) .. " amount:" .. tostring(-1 * amount))
-                                    addCredits(id, (-1 * amount))
-                                    cryptoNet.send(socket, { message, true })
-                                else
-                                    debugLog("Failed: credits + amount > 0")
-                                    cryptoNet.send(socket, { message, false })
-                                end
-                            else
-                                debugLog(
-                                    "Failed: type(id) == number and type(data.amount) == number and checkIDExists(id)")
-                                cryptoNet.send(socket, { message, false })
-                            end
+        elseif event[2] ~= nil then
+            --User is not logged in
+            if message == "hashLogin" then
+                --Need to auth with bank server
+                --debugLog("hashLogin")
+                print("User login request for: " .. data.username)
+                log("User login request for: " .. data.username)
+                local loginStatus = cryptoNet.checkPassword(data.username, data.password, serverLAN)
+                data.password = nil
+                local permissionLevel = cryptoNet.getPermissionLevel(data.username, serverLAN)
+                --debugLog("loginStatus:"..tostring(loginStatus))
+                if loginStatus == true then
+                    cryptoNet.send(socket, { "hashLogin", true, permissionLevel })
+                    socket.username = data.username
+                    socket.permissionLevel = permissionLevel
+
+                    --Update internal sockets
+                    for k, v in pairs(serverLAN.sockets) do
+                        if v.target == socket.target then
+                            serverLAN.sockets[k] = socket
+                            break
                         end
                     end
+                    os.queueEvent("hash_login", socket.username, socket)
                 else
-                    cryptoNet.send(socket, { message, false })
+                    print("User: " .. data.username .. " failed to login")
+                    log("User: " .. data.username .. " failed to login")
+                    cryptoNet.send(socket, { "hashLogin", false })
                 end
-            elseif message == "checkID" then
-                if type(data) == "string" then
-                    local id = peripheral.wrap(data).getDiskID()
-                    cryptoNet.send(socket, { message, checkIDExists(id) })
-                end
-            elseif message == "getCredits" then
-                if type(data) == "string" then
-                    local id = peripheral.wrap(data).getDiskID()
-                    cryptoNet.send(socket, { message, getCredits(id) })
-                end
-            elseif message == "getCertificate" then
-                local fileContents = nil
-                print("Sending Cert " .. socket.sender .. ".crt")
-                local filePath = socket.sender .. ".crt"
-                if fs.exists(filePath) then
-                    local file = fs.open(filePath, "r")
-                    fileContents = file.readAll()
-                    file.close()
-                end
-                cryptoNet.send(socket, { message, fileContents })
+            else
+                debugLog("User is not logged in. Sender: " .. socket.sender .. " Target: " .. socket.target)
+                cryptoNet.send(socket, "Sorry, I only talk to logged in users")
             end
         end
     end
@@ -473,14 +506,14 @@ local function onStart()
 
     --Read user database from disk
     if fs.exists("database.db") then
-        print("Reading User database")
+        print("Reading credits database")
         local storageFile = fs.open("database.db", "r")
         local contents = storageFile.readAll()
         storageFile.close()
 
         local decoded = textutils.unserialize(contents)
         if type(decoded) ~= "nil" then
-            users = decoded
+            creditsDB = decoded
         else
             error("ERROR CANNOT READ DATABASE database.db")
             log("ERROR CANNOT READ DATABASE database.db")
@@ -488,9 +521,9 @@ local function onStart()
             sleep(10)
         end
     else
-        print("Creating new user database")
+        print("Creating new credits database")
         local storageFile = fs.open("database.db", "w")
-        storageFile.write(textutils.serialise(users))
+        storageFile.write(textutils.serialise(creditsDB))
         storageFile.close()
     end
 
@@ -520,6 +553,20 @@ local function onStart()
     printMonitorValue()
 
     serverLAN = cryptoNet.host(settings.get("serverName"), true, false)
+    if cryptoNet.userExists("ATM", serverLAN) == false then
+        print("User ATM not found")
+        print("Enter new ATM User Password:")
+        local inputPass = read()
+        print("Creating ATM user")
+        cryptoNet.addUser("ATM", inputPass, 3, serverLAN)
+    end
+    if cryptoNet.userExists("ARCADE", serverLAN) == false then
+        print("User ARCADE not found")
+        print("Enter new ARCADE User Password:")
+        local inputPass = read()
+        print("Creating ARCADE user")
+        cryptoNet.addUser("ARCADE", inputPass, 3, serverLAN)
+    end
 end
 
 checkUpdates()
