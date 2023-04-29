@@ -19,6 +19,7 @@ end
 
 if modem == nil then
     print("No Wireless Modem found")
+    print("Place this pocket computer in a crafting table with a Wireless Modem above it to craft a Wireless Pocket Computer")
     return
 end
 
