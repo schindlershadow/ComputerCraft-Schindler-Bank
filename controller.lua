@@ -19,7 +19,8 @@ end
 
 if modem == nil then
     print("No Wireless Modem found")
-    print("Place this pocket computer in a crafting table with a Wireless Modem above it to craft a Wireless Pocket Computer")
+    print(
+    "Place this pocket computer in a crafting table with a Wireless Modem above it to craft a Wireless Pocket Computer")
     return
 end
 
@@ -127,7 +128,7 @@ local function drawTransition(color)
     term.setBackgroundColor(color)
     for i = 1, termY do
         --paintutils.drawLine(1, i, termX, i, color)
-        term.setCursorPos(1,i)
+        term.setCursorPos(1, i)
         term.clearLine()
         sleep(0)
     end
@@ -321,6 +322,9 @@ local function newUserMenu(serverName, code)
 
         border = 1
 
+        term.setCursorPos(1, forth + 5)
+        centerText("Press \"TAB\" to switch")
+
         term.setBackgroundColor(colors.white)
         term.setTextColor(colors.black)
         for i = border + 6, width - border - 1, 1 do
@@ -330,7 +334,11 @@ local function newUserMenu(serverName, code)
         term.setCursorPos(border + 6, forth + 6)
         term.write(user)
         term.setCursorPos(border + 1, forth + 6)
-        term.setBackgroundColor(colors.lightGray)
+        if selectedField == "user" then
+            term.setBackgroundColor(colors.green)
+        else
+            term.setBackgroundColor(colors.lightGray)
+        end
         print("User:")
 
         term.setBackgroundColor(colors.white)
@@ -344,7 +352,11 @@ local function newUserMenu(serverName, code)
             term.write("*")
         end
         term.setCursorPos(border + 1, forth + 8)
-        term.setBackgroundColor(colors.lightGray)
+        if selectedField == "pass" then
+            term.setBackgroundColor(colors.green)
+        else
+            term.setBackgroundColor(colors.lightGray)
+        end
         print("Pass:")
 
         term.setCursorPos(border + 1, forth + 10)
@@ -495,6 +507,8 @@ local function loginMenu(serverName, code, serverType)
 
         border = 1
 
+        term.setCursorPos(1, forth + 5)
+        centerText("Press \"TAB\" to switch")
         term.setBackgroundColor(colors.white)
         term.setTextColor(colors.black)
         for i = border + 6, width - border - 1, 1 do
@@ -504,7 +518,11 @@ local function loginMenu(serverName, code, serverType)
         term.setCursorPos(border + 6, forth + 6)
         term.write(user)
         term.setCursorPos(border + 1, forth + 6)
-        term.setBackgroundColor(colors.lightGray)
+        if selectedField == "user" then
+            term.setBackgroundColor(colors.green)
+        else
+            term.setBackgroundColor(colors.lightGray)
+        end
         print("User:")
 
         term.setBackgroundColor(colors.white)
@@ -518,7 +536,11 @@ local function loginMenu(serverName, code, serverType)
             term.write("*")
         end
         term.setCursorPos(border + 1, forth + 8)
-        term.setBackgroundColor(colors.lightGray)
+        if selectedField == "pass" then
+            term.setBackgroundColor(colors.green)
+        else
+            term.setBackgroundColor(colors.lightGray)
+        end
         print("Pass:")
 
         term.setCursorPos(1, forth + 10)
@@ -811,7 +833,8 @@ local function drawHelp()
     term.setBackgroundColor(colors.gray)
     term.setCursorPos(1, 3)
     textutils.slowPrint(
-        "Schindler controller is your interface to Schindler Bank, Schindler Arcade and Schindler casino. Throwing a Wireless Pocket computer into a Schindler Bank ATM will create this controller software.",40)
+        "Schindler controller is your interface to Schindler Bank, Schindler Arcade and Schindler casino. Throwing a Wireless Pocket computer into a Schindler Bank ATM will create this controller software.",
+        40)
     sleep(0)
     term.setCursorPos(1, 20)
     centerText("Press any key to continue...")
@@ -867,7 +890,6 @@ local function onStart()
         term.setCursorPos(2, 13)
         if username ~= "" then
             term.write("3) Logout")
-            
         else
             term.write("3) Cache login")
         end
@@ -901,7 +923,10 @@ local function onStart()
     end
 end
 
-checkUpdates()
+
+if not settings.get("debug") then
+    checkUpdates()
+end
 cryptoNet.setLoggingEnabled(false)
 pcall(cryptoNet.startEventLoop, onStart, onEvent)
 cryptoNet.closeAll()
