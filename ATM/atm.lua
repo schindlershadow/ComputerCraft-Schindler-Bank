@@ -193,7 +193,7 @@ end
 
 local function pullDisk(slot)
     if hopper ~= nil and diskdrive ~= nil then
-        if hopper.getItemDetail(slot).name == "computercraft:disk" or hopper.getItemDetail(slot).name == "computercraft:pocket_computer_advanced" then
+        if hopper.getItemDetail(slot).name == "computercraft:pocket_computer_normal" or hopper.getItemDetail(slot).name == "computercraft:pocket_computer_advanced" then
             hopper.pushItems(peripheral.getName(diskdrive), slot, 1, 1)
         else
             print("Tried to pull nondisk item to disk drive")
