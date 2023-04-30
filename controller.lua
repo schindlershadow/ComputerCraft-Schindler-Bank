@@ -895,6 +895,9 @@ local function onStart()
         end
         term.setCursorPos(1, 20)
         term.write("ID:" .. os.getComputerID())
+        local txt = "Press \"ESC\" to close"
+        term.setCursorPos(termX-string.len(txt)+1, 20)
+        term.write(txt)
         term.setCursorPos(1, 1)
 
         local event, key
